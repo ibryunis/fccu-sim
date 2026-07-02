@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>FCCU Simulator</title>
+<style>
+  :root {
+    --bg:#0d1117; --panel:#161b22; --border:#30363d; --grid:#21262d;
+    --text:#e6edf3; --dim:#8b949e; --accent:#58a6ff; --ok:#3fb950;
+    --warn:#d29922; --bad:#f85149; --bad-bg:#2d1416;
+  }
+  * { box-sizing:border-box; margin:0; }
+  body { background:var(--bg); color:var(--text);
+         font:13px/1.45 "Segoe UI",system-ui,sans-serif; padding:16px; }
+  .wrap { max-width:1500px; margin:0 auto; }
+  header { display:flex; align-items:baseline; gap:14px; margin-bottom:14px; }
+  header h1 { font-size:17px; font-weight:600; }
+  header .sub { color:var(--dim); font-size:12px; }
+  header .time { margin-left:auto; color:var(--dim); font-variant-numeric:tabular-nums; }
+
+  .panel { background:var(--panel); border:1px solid var(--border);
+           border-radius:8px; padding:12px 14px; }
+  .panel h2 { font-size:11px; font-weight:600; text-transform:uppercase;
+              letter-spacing:1px; color:var(--dim); margin-bottom:10px; }
+  .row { display:flex; gap:12px; margin-bottom:12px; flex-wrap:wrap; }
+
+  /* fault banner */
+  #banner { display:none; background:var(--bad-bg); border:1px solid var(--bad);
+            border-radius:8px; padding:12px 16px; margin-bottom:12px;
+            font-size:14px; font-weight:600; color:var(--bad); }
+  #banner .hint { display:block; font-weight:400; font-size:12px;
+                  color:var(--dim); margin-top:4px; }
+
+  /* state machine */
+  #fsm { display:flex; align-items:center; gap:0; flex-wrap:wrap; }
+  .node { padding:7px 16px; border-radius:6px; border:1.5px solid var(--border);
+          color:var(--dim); font-weight:600; font-size:12px;
+          background:var(--bg); transition:all .2s; }
+  .node.active { border-color:var(--accent); color:var(--accent);
+                 box-shadow:0 0 12px rgba(88,166,255,.35); }
+  .node.done { color:var(--text); border-color:#4d5766; }
+  .edge { width:26px; height:2px; background:var(--border); position:relative; }
+  .edge::after { content:''; position:absolute; right:0; top:-3px;
+                 border:4px solid transparent; border-left-color:var(--border); }
+  #fsm .fault-node { margin-left:28px; border-style:dashed; }
+  .node.fault-node.active { border-color:var(--bad); color:var(--bad);
+                            background:var(--bad-bg);
+                            box-shadow:0 0 14px rgba(248,81,73,.4); }
+  .startup-label { font-size:10px; color:var(--dim); letter-spacing:1px; }
+
+  /* gauges */
+  .gauges { display:grid; grid-template-columns:repeat(6,1fr); gap:12px; flex:1; }
+  .gauge .name { font-size:11px; color:var(--dim); text-transform:uppercase;
+                 letter-spacing:.5px; }
+  .gauge .val { font-size:24px; font-weight:700; font-variant-numeric:tabular-nums;
+                margin:2px 0 6px; }
+  .gauge .val small { font-size:12px; font-weight:400; color:var(--dim); }
+  .gauge.alert .val { color:var(--bad); }
+  .gauge.dead .val { color:var(--dim); }
+  .scale { height:6px; background:var(--grid); border-radius:3px; position:relative; }
+  .scale .fill { height:100%; border-radius:3px; background:var(--accent);
+                 transition:width .15s; }
+  .gauge.alert .scale .fill { background:var(--bad); }
+  .scale .lim { position:absolute; top:-2px; width:2px; height:10px;
+                background:var(--warn); }
+
+  /* charts */
+  .charts { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  canvas { width:100%; height:170px; display:block; }
+
+  /* controls */
+  button { background:#21262d; color:var(--text); border:1px solid var(--border);
+           border-radius:6px; padding:7px 14px; cursor:pointer; font-weight:600;
+           font-size:12px; }
+  button:hover { border-color:var(--accent); }
+  button.start { background:#1a3626; border-color:var(--ok); color:var(--ok); }
+  button.reset { background:var(--bad-bg); border-color:var(--bad); color:var(--bad); }
+  select { background:#21262d; color:var(--text); border:1px solid var(--border);
+           border-radius:6px; padding:6px 8px; font-size:12px; }
+  input[type=range] { width:200px; accent-color:var(--accent); vertical-align:middle; }
+  .ctl { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .sep { width:1px; height:24px; background:var(--border); }
+
+  /* actuators */
+  .acts { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; flex:1; }
+  .act .label { display:flex; justify-content:space-between; font-size:11px;
+                color:var(--dim); margin-bottom:4px;
+                font-variant-numeric:tabular-nums; }
+  .bar { height:8px; background:var(--grid); border-radius:4px; overflow:hidden; }
+  .bar div { height:100%; background:var(--accent); width:0; transition:width .15s; }
+
+  #history { font-size:11.5px; color:var(--dim); font-family:Consolas,monospace;
+             line-height:1.7; }
+  .failed { color:var(--warn); font-size:12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>FCCU Simulator</h1>
+  <span class="sub">hydrogen-electric Formula Student &middot; fuel cell control unit</span>
+  <span class="time" id="t">t = 0.0 s</span>
+</header>
+
+<div id="banner"></div>
+
+<div class="row">
+  <div class="panel" style="flex:1">
+    <h2>State machine</h2>
+    <div id="fsm">
+      <span class="node" data-s="OFF">OFF</span><span class="edge"></span>
+      <span class="node" data-s="PURGE">PURGE</span><span class="edge"></span>
+      <span class="node" data-s="PRESSURIZE">PRESSURIZE</span><span class="edge"></span>
+      <span class="node" data-s="WARMUP">WARMUP</span><span class="edge"></span>
+      <span class="node" data-s="RUNNING">RUNNING</span><span class="edge"></span>
+      <span class="node" data-s="SHUTDOWN">SHUTDOWN</span>
+      <span class="node fault-node" data-s="FAULT">FAULT</span>
+    </div>
+  </div>
+</div>
+
+<div class="row">
+  <div class="gauges">
+    <div class="panel gauge" id="G-power"><div class="name">Power</div>
+      <div class="val"><span>0.0</span> <small>kW</small></div>
+      <div class="scale"><div class="fill"></div></div></div>
+    <div class="panel gauge" id="G-volt"><div class="name">Stack voltage</div>
+      <div class="val"><span>0</span> <small>V</small></div>
+      <div class="scale"><div class="fill"></div></div></div>
+    <div class="panel gauge" id="G-curr"><div class="name">Stack current</div>
+      <div class="val"><span>0</span> <small>A</small></div>
+      <div class="scale"><div class="fill"></div><div class="lim" style="left:90%"></div></div></div>
+    <div class="panel gauge" id="G-cool"><div class="name">Coolant</div>
+      <div class="val"><span>25</span> <small>&deg;C / 80</small></div>
+      <div class="scale"><div class="fill"></div><div class="lim" style="left:80%"></div></div></div>
+    <div class="panel gauge" id="G-tank"><div class="name">Tank</div>
+      <div class="val"><span>350</span> <small>bar / 400</small></div>
+      <div class="scale"><div class="fill"></div><div class="lim" style="left:95.2%"></div></div></div>
+    <div class="panel gauge" id="G-anode"><div class="name">Anode</div>
+      <div class="val"><span>1.00</span> <small>bar &rarr; 2.0</small></div>
+      <div class="scale"><div class="fill"></div><div class="lim" style="left:75%"></div></div></div>
+  </div>
+</div>
+
+<div class="row">
+  <div class="panel" style="flex:1.1">
+    <h2>Controls</h2>
+    <div class="ctl">
+      <button class="start" onclick="cmd('start')">START</button>
+      <button onclick="cmd('stop')">STOP</button>
+      <button class="reset" onclick="cmd('reset')">RESET LATCH</button>
+      <span class="sep"></span>
+      <span>Demand <input type="range" id="dem" min="0" max="100" value="0"
+        oninput="demand(this.value)"> <b id="demv"
+        style="display:inline-block;min-width:36px">0%</b></span>
+    </div>
+  </div>
+  <div class="panel" style="flex:1.6">
+    <h2>Fault injection</h2>
+    <div class="ctl">
+      <button onclick="inject('kind=pressure_spike')">Pressure spike</button>
+      <button id="ovh" onclick="overheat()">Block cooling</button>
+      <span class="sep"></span>
+      <select id="fsen"><option>tank_pressure</option><option>tank_temp</option>
+        <option>stack_voltage</option><option>stack_current</option>
+        <option>coolant_temp</option><option>anode_pressure</option>
+        <option>h2_flow</option></select>
+      <select id="fmod"><option>disconnected</option><option>stuck</option>
+        <option>out_of_range</option></select>
+      <button onclick="failS()">Fail</button>
+      <button onclick="repairS()">Repair</button>
+      <span class="failed" id="flist"></span>
+    </div>
+  </div>
+</div>
+
+<div class="charts">
+  <div class="panel"><h2>Current: setpoint vs delivered (A)</h2><canvas id="c1"></canvas></div>
+  <div class="panel"><h2>Stack voltage (V) &middot; power (kW)</h2><canvas id="c2"></canvas></div>
+  <div class="panel" style="margin-top:12px"><h2>Temperatures (&deg;C)</h2><canvas id="c3"></canvas></div>
+  <div class="panel" style="margin-top:12px"><h2>Anode pressure (bar) &middot; tank (bar/100)</h2><canvas id="c4"></canvas></div>
+</div>
+
+<div class="row" style="margin-top:12px">
+  <div class="panel" style="flex:1.2">
+    <h2>Actuators</h2>
+    <div class="acts">
+      <div class="act"><div class="label"><span>H2 valve</span><span id="a-h2_valve">0%</span></div><div class="bar"><div id="b-h2_valve"></div></div></div>
+      <div class="act"><div class="label"><span>Compressor</span><span id="a-compressor">0%</span></div><div class="bar"><div id="b-compressor"></div></div></div>
+      <div class="act"><div class="label"><span>Recirc pump</span><span id="a-recirc_pump">0%</span></div><div class="bar"><div id="b-recirc_pump"></div></div></div>
+      <div class="act"><div class="label"><span>Cooling</span><span id="a-cooling">0%</span></div><div class="bar"><div id="b-cooling"></div></div></div>
+    </div>
+  </div>
+  <div class="panel" style="flex:1">
+    <h2>Fault history</h2>
+    <div id="history">none</div>
+  </div>
+</div>
+</div>
+
+<script>
+'use strict';
+const WINDOW_S = 60;
+
+function niceStep(range, target) {
+  const raw = range / target, mag = 10 ** Math.floor(Math.log10(raw));
+  for (const m of [1, 2, 5, 10]) if (raw <= m * mag) return m * mag;
+  return 10 * mag;
+}
+
+class Chart {
+  constructor(id, series) {   // series: [{label, color}]
+    this.cv = document.getElementById(id);
+    this.ctx = this.cv.getContext('2d');
+    this.series = series.map(s => ({...s, pts: []}));
+  }
+  push(t, values) {
+    this.series.forEach((s, i) => {
+      s.pts.push([t, values[i]]);
+      while (s.pts.length && s.pts[0][0] < t - WINDOW_S) s.pts.shift();
+    });
+    this.draw(t);
+  }
+  draw(now) {
+    const cv = this.cv, ctx = this.ctx, dpr = devicePixelRatio || 1;
+    const w = cv.clientWidth, h = cv.clientHeight;
+    if (cv.width !== w * dpr) { cv.width = w * dpr; cv.height = h * dpr; }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+    const L = 42, R = 8, T = 18, B = 18, pw = w - L - R, ph = h - T - B;
+
+    let lo = Infinity, hi = -Infinity;
+    for (const s of this.series) for (const [, v] of s.pts)
+      if (Number.isFinite(v)) { lo = Math.min(lo, v); hi = Math.max(hi, v); }
+    if (!Number.isFinite(lo)) { lo = 0; hi = 1; }
+    if (hi - lo < 1e-9) { hi += 1; lo -= 1; }
+    const pad = (hi - lo) * 0.08; lo -= pad; hi += pad;
+
+    const x = t => L + (t - (now - WINDOW_S)) / WINDOW_S * pw;
+    const y = v => T + (1 - (v - lo) / (hi - lo)) * ph;
+
+    // grid + y ticks
+    ctx.strokeStyle = '#21262d'; ctx.fillStyle = '#8b949e';
+    ctx.font = '10px Consolas,monospace'; ctx.lineWidth = 1;
+    const ys = niceStep(hi - lo, 4);
+    for (let v = Math.ceil(lo / ys) * ys; v <= hi; v += ys) {
+      ctx.beginPath(); ctx.moveTo(L, y(v)); ctx.lineTo(w - R, y(v)); ctx.stroke();
+      ctx.fillText(v.toFixed(Math.max(0, -Math.floor(Math.log10(ys)))), 4, y(v) + 3);
+    }
+    // x ticks every 10 s
+    ctx.textAlign = 'center';
+    for (let ts = Math.ceil((now - WINDOW_S) / 10) * 10; ts <= now; ts += 10) {
+      ctx.beginPath(); ctx.moveTo(x(ts), T); ctx.lineTo(x(ts), h - B); ctx.stroke();
+      ctx.fillText(ts.toFixed(0) + 's', x(ts), h - 5);
+    }
+    ctx.textAlign = 'left';
+
+    // series
+    for (const s of this.series) {
+      ctx.strokeStyle = s.color; ctx.lineWidth = 1.6; ctx.beginPath();
+      let pen = false;
+      for (const [t, v] of s.pts) {
+        if (!Number.isFinite(v)) { pen = false; continue; }  // gap = dead sensor
+        pen ? ctx.lineTo(x(t), y(v)) : ctx.moveTo(x(t), y(v));
+        pen = true;
+      }
+      ctx.stroke();
+    }
+    // legend with latest values
+    let lx = L + 4;
+    for (const s of this.series) {
+      const last = s.pts.length ? s.pts[s.pts.length - 1][1] : NaN;
+      const txt = `${s.label} ${Number.isFinite(last) ? last.toFixed(1) : '--'}`;
+      ctx.fillStyle = s.color; ctx.fillText(txt, lx, 12);
+      lx += ctx.measureText(txt).width + 16;
+    }
+  }
+}
+
+const charts = [
+  new Chart('c1', [{label:'setpoint', color:'#8b949e'}, {label:'delivered', color:'#58a6ff'}]),
+  new Chart('c2', [{label:'voltage', color:'#3fb950'}, {label:'power', color:'#d29922'}]),
+  new Chart('c3', [{label:'coolant', color:'#f85149'}, {label:'tank', color:'#58a6ff'}]),
+  new Chart('c4', [{label:'anode', color:'#3fb950'}, {label:'tank/100', color:'#58a6ff'}]),
+];
+
+const post = q => fetch('/api/' + q, {method:'POST'});
+const cmd = n => post('command?name=' + n);
+const inject = q => post('inject?' + q);
+function demand(v) {
+  document.getElementById('demv').textContent = v + '%';
+  post('demand?value=' + v);
+}
+let ovh = false;
+function overheat() { inject('kind=' + (ovh ? 'clear_overheat' : 'overheat')); }
+const failS = () => inject('kind=sensor_fail&sensor=' +
+  document.getElementById('fsen').value + '&mode=' +
+  document.getElementById('fmod').value);
+const repairS = () => inject('kind=sensor_repair&sensor=' +
+  document.getElementById('fsen').value);
+
+const $ = id => document.getElementById(id);
+const fmt = (v, d) => Number.isFinite(v) ? (v.toFixed(d).replace(/^-(0(\.0*)?)$/, '$1')) : '--';
+
+function gauge(id, v, max, d, alert) {
+  const g = $(id);
+  g.querySelector('.val span').textContent = fmt(v, d);
+  g.querySelector('.fill').style.width =
+    Number.isFinite(v) ? Math.min(v / max * 100, 100).toFixed(1) + '%' : '0%';
+  g.classList.toggle('alert', !!alert);
+  g.classList.toggle('dead', !Number.isFinite(v));
+}
+
+const ORDER = ['OFF','PURGE','PRESSURIZE','WARMUP','RUNNING','SHUTDOWN'];
+function update(s) {
+  $('t').textContent = 't = ' + s.t.toFixed(1) + ' s';
+
+  const idx = ORDER.indexOf(s.state);
+  document.querySelectorAll('.node').forEach(n => {
+    n.classList.toggle('active', n.dataset.s === s.state);
+    n.classList.toggle('done', idx > 0 && ORDER.indexOf(n.dataset.s) < idx
+                               && n.dataset.s !== 'OFF');
+  });
+
+  const b = $('banner');
+  b.style.display = s.fault ? 'block' : 'none';
+  if (s.fault) b.innerHTML = s.fault +
+    '<span class="hint">hydrogen cut, latch set &mdash; fix the cause, then RESET LATCH</span>';
+
+  const r = s.readings;
+  gauge('G-power', s.power_kw, 22, 1);
+  gauge('G-volt', r.stack_voltage, 120, 1);
+  gauge('G-curr', r.stack_current, 400, 0, r.stack_current > 360);
+  gauge('G-cool', r.coolant_temp, 100, 1, r.coolant_temp > 80);
+  gauge('G-tank', r.tank_pressure, 420, 0, r.tank_pressure > 400);
+  gauge('G-anode', r.anode_pressure, 2.67, 2, r.anode_pressure > 3);
+
+  charts[0].push(s.t, [s.current_setpoint, r.stack_current]);
+  charts[1].push(s.t, [r.stack_voltage, s.power_kw]);
+  charts[2].push(s.t, [r.coolant_temp, r.tank_temp]);
+  charts[3].push(s.t, [r.anode_pressure,
+                       r.tank_pressure == null ? NaN : r.tank_pressure / 100]);
+
+  for (const [k, v] of Object.entries(s.actuators)) {
+    $('a-' + k).textContent = (v * 100).toFixed(0) + '%';
+    $('b-' + k).style.width = (v * 100).toFixed(0) + '%';
+  }
+
+  ovh = s.cooling_blocked;
+  $('ovh').textContent = ovh ? 'Unblock cooling' : 'Block cooling';
+  const fails = Object.entries(s.sensor_failures);
+  $('flist').textContent = fails.length
+    ? fails.map(([n, m]) => `${n}: ${m}`).join(', ') : '';
+  $('history').innerHTML = s.fault_history.length
+    ? s.fault_history.map(f => '<div>' + f + '</div>').join('') : 'none';
+}
+
+const es = new EventSource('/api/events');   // auto-reconnects on drop
+es.onmessage = e => {
+  const s = JSON.parse(e.data);
+  // charts read null as NaN gaps
+  for (const k in s.readings) if (s.readings[k] === null) s.readings[k] = NaN;
+  update(s);
+};
+</script>
+</body>
+</html>
