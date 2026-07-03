@@ -1,7 +1,9 @@
 // End-to-end: full startup, load tracking, every fault injection,
 // latch + reset flow. Runs the real Simulation single-threaded.
+#include <chrono>
 #include <cmath>
 #include <string>
+#include <thread>
 
 #include "catch_amalgamated.hpp"
 #include "fccu/fuel_cell.hpp"
@@ -154,6 +156,15 @@ TEST_CASE("stuck sensor is detected while running") {
     REQUIRE(run_until(sim, [](Simulation& s) { return s.state() == State::fault; },
                       5.0));
     CHECK(sim.safety().fault()->reason == "sensor stuck: coolant_temp");
+}
+
+TEST_CASE("real-time thread records loop timing samples") {
+    Simulation sim;
+    sim.start_thread();
+    std::this_thread::sleep_for(std::chrono::milliseconds(600));
+    Snapshot s = sim.snapshot();
+    CHECK(s.exec_us.size() > 20);    // ~60 ticks in 600 ms
+    CHECK(s.period_us.size() > 20);
 }
 
 TEST_CASE("energy accounting tracks a run and resets on the next purge") {

@@ -1,7 +1,9 @@
 #include "http_api.hpp"
 
+#include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <cstdint>
 #include <format>
 #include <optional>
 #include <sstream>
@@ -45,6 +47,25 @@ std::string num(double v, int decimals = 3) {
     return std::format("{:.{}f}", v, decimals);
 }
 
+std::uint32_t pct(std::vector<std::uint32_t>& v, double p) {
+    if (v.empty()) return 0;
+    auto k = static_cast<std::size_t>(p * static_cast<double>(v.size() - 1));
+    std::nth_element(v.begin(), v.begin() + k, v.end());
+    return v[k];
+}
+
+std::string timing_json(std::vector<std::uint32_t> exec,
+                        std::vector<std::uint32_t> period) {
+    std::uint32_t exec_max = exec.empty() ? 0 : *std::max_element(exec.begin(), exec.end());
+    std::uint32_t per_max = period.empty() ? 0 : *std::max_element(period.begin(), period.end());
+    return std::format(
+        "{{\"samples\":{},\"exec_p50_us\":{},\"exec_p95_us\":{},"
+        "\"exec_p99_us\":{},\"exec_max_us\":{},\"period_p50_us\":{},"
+        "\"period_p99_us\":{},\"period_max_us\":{}}}",
+        exec.size(), pct(exec, 0.5), pct(exec, 0.95), pct(exec, 0.99), exec_max,
+        pct(period, 0.5), pct(period, 0.99), per_max);
+}
+
 } // namespace
 
 std::string to_json(const Snapshot& s) {
@@ -63,6 +84,7 @@ std::string to_json(const Snapshot& s) {
         j << (i ? "," : "") << '"' << s.fault_history[i].describe() << '"';
     }
     j << "],\"overruns\":" << s.overruns
+      << ",\"timing\":" << timing_json(s.exec_us, s.period_us)
       << ",\"demand_pct\":" << num(s.demand_pct, 0)
       << ",\"current_setpoint\":" << num(s.current_setpoint, 1)
       << ",\"power_kw\":" << num(s.power_kw, 2)

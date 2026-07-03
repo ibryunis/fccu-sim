@@ -207,6 +207,14 @@
     <div id="history">none</div>
   </div>
 </div>
+
+<div class="row">
+  <div class="panel" style="flex:1">
+    <h2>Loop timing &mdash; 100 Hz sim thread (last ~20 s)</h2>
+    <div id="timing" style="font-size:12px;color:var(--dim);font-family:Consolas,monospace">
+      collecting&hellip;</div>
+  </div>
+</div>
 </div>
 
 <script>
@@ -351,6 +359,12 @@ function update(s) {
   charts[2].push(s.t, [r.coolant_temp, r.tank_temp]);
   charts[3].push(s.t, [r.anode_pressure,
                        r.tank_pressure == null ? NaN : r.tank_pressure / 100]);
+
+  const tm = s.timing;
+  $('timing').textContent = tm.samples < 100 ? 'collecting… (' + tm.samples + ' samples)'
+    : `exec p50 ${tm.exec_p50_us} µs | p95 ${tm.exec_p95_us} µs | p99 ${tm.exec_p99_us} µs | max ${tm.exec_max_us} µs` +
+      `   │   period p50 ${(tm.period_p50_us/1000).toFixed(1)} ms | p99 ${(tm.period_p99_us/1000).toFixed(1)} ms | max ${(tm.period_max_us/1000).toFixed(1)} ms` +
+      `   │   deadline misses ${s.overruns}`;
 
   $('e-h2').textContent = fmt(s.h2_consumed_g, 1);
   $('e-wh').textContent = fmt(s.energy_wh, 0);

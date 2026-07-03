@@ -134,6 +134,10 @@ Snapshot Simulation::snapshot() const {
         s.fault_history.push_back(hist[i]);  // describe() happens outside the lock
     }
     s.overruns = overruns_.load();
+    std::size_t ne = std::min(exec_n_, TIMING_RING);
+    s.exec_us.assign(exec_ring_.begin(), exec_ring_.begin() + ne);
+    std::size_t np = std::min(period_n_, TIMING_RING);
+    s.period_us.assign(period_ring_.begin(), period_ring_.begin() + np);
     s.demand_pct = demand_pct_;
     s.current_setpoint = control_.current_setpoint();
     s.power_kw = plant_.voltage() * plant_.current() / 1000.0;
@@ -157,12 +161,27 @@ Snapshot Simulation::snapshot() const {
 void Simulation::start_thread() {
     thread_ = std::jthread([this](std::stop_token stop) {
         using clock = std::chrono::steady_clock;
+        using std::chrono::duration_cast;
+        using std::chrono::microseconds;
         constexpr auto period =
-            std::chrono::duration_cast<clock::duration>(
-                std::chrono::duration<double>(TICK_DT));
+            duration_cast<clock::duration>(std::chrono::duration<double>(TICK_DT));
         auto next = clock::now();
+        clock::time_point prev_wake{};
         while (!stop.stop_requested()) {
+            auto t0 = clock::now();
             step();
+            auto t1 = clock::now();
+            {
+                std::scoped_lock lock(mutex_);
+                exec_ring_[exec_n_++ % TIMING_RING] = static_cast<std::uint32_t>(
+                    duration_cast<microseconds>(t1 - t0).count());
+                if (prev_wake != clock::time_point{}) {
+                    period_ring_[period_n_++ % TIMING_RING] =
+                        static_cast<std::uint32_t>(
+                            duration_cast<microseconds>(t0 - prev_wake).count());
+                }
+            }
+            prev_wake = t0;
             next += period;  // absolute deadline: jitter never accumulates
             if (next < clock::now()) {
                 next = clock::now();  // fell behind: resync, don't burst-catch-up

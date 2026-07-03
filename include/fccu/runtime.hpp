@@ -16,6 +16,7 @@
 #pragma once
 
 #include <atomic>
+#include <cstdint>
 #include <filesystem>
 #include <mutex>
 #include <optional>
@@ -44,7 +45,11 @@ struct Snapshot {
     bool latched = false;
     std::optional<FaultRecord> fault;
     std::vector<FaultRecord> fault_history;  // last 5; described outside the lock
-    long overruns = 0;                       // ticks where the loop fell behind
+    long overruns = 0;                       // deadline misses (loop fell behind)
+    // raw loop timing samples (microseconds), copied from the ring buffers;
+    // percentiles are computed by the caller, outside the sim lock
+    std::vector<std::uint32_t> exec_us;      // step() execution time
+    std::vector<std::uint32_t> period_us;    // wakeup-to-wakeup period
     double demand_pct = 0.0;
     double current_setpoint = 0.0;
     double power_kw = 0.0;
@@ -115,6 +120,13 @@ private:
     std::optional<CsvLogger> logger_;
     std::filesystem::path log_path_;
     std::atomic<long> overruns_{0};
+
+    // fixed rings, written only by the sim thread (~20 s of history at 100 Hz)
+    static constexpr std::size_t TIMING_RING = 2048;
+    std::array<std::uint32_t, TIMING_RING> exec_ring_{};
+    std::array<std::uint32_t, TIMING_RING> period_ring_{};
+    std::size_t exec_n_ = 0;
+    std::size_t period_n_ = 0;
 
     mutable std::mutex mutex_;
     std::jthread thread_;  // last member: joins before the rest is destroyed
