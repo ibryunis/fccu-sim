@@ -191,6 +191,17 @@
       <div class="act"><div class="label"><span>Cooling</span><span id="a-cooling">0%</span></div><div class="bar"><div id="b-cooling"></div></div></div>
     </div>
   </div>
+  <div class="panel" style="flex:.8">
+    <h2>Energy &mdash; this run</h2>
+    <div class="acts" style="grid-template-columns:repeat(3,1fr)">
+      <div class="gauge"><div class="name">H2 used</div>
+        <div class="val"><span id="e-h2">0.0</span> <small>g</small></div></div>
+      <div class="gauge"><div class="name">Delivered</div>
+        <div class="val"><span id="e-wh">0</span> <small>Wh</small></div></div>
+      <div class="gauge"><div class="name">Stack eff. (LHV)</div>
+        <div class="val"><span id="e-eff">0</span> <small>%</small></div></div>
+    </div>
+  </div>
   <div class="panel" style="flex:1">
     <h2>Fault history</h2>
     <div id="history">none</div>
@@ -340,6 +351,10 @@ function update(s) {
   charts[2].push(s.t, [r.coolant_temp, r.tank_temp]);
   charts[3].push(s.t, [r.anode_pressure,
                        r.tank_pressure == null ? NaN : r.tank_pressure / 100]);
+
+  $('e-h2').textContent = fmt(s.h2_consumed_g, 1);
+  $('e-wh').textContent = fmt(s.energy_wh, 0);
+  $('e-eff').textContent = fmt(s.stack_efficiency_pct, 1);
 
   for (const [k, v] of Object.entries(s.actuators)) {
     $('a-' + k).textContent = (v * 100).toFixed(0) + '%';

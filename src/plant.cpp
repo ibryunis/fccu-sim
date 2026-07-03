@@ -43,6 +43,8 @@ void Plant::step(double dt, double current_request, bool purge_open) {
     double drawn = dt > 0.0 ? tank_.draw(h2_flow_ * dt) / dt : 0.0;
     double consumed = fc::h2_consumption(current_) / recirc_pump_.h2_efficiency();
     double vent = purge_open ? PURGE_FLOW : 0.0;
+    h2_consumed_mol_ += consumed * dt;
+    energy_wh_ += voltage_ * current_ * dt / 3600.0;
     double t_k = stack_temp_ + 273.15;
     double dp_pa = (drawn - consumed - vent) * fc::GAS_R * t_k / ANODE_VOLUME_M3 * dt;
     anode_pressure_ = std::max(anode_pressure_ + dp_pa / 1e5, 0.0);

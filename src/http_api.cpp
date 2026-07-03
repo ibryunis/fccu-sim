@@ -66,6 +66,9 @@ std::string to_json(const Snapshot& s) {
       << ",\"demand_pct\":" << num(s.demand_pct, 0)
       << ",\"current_setpoint\":" << num(s.current_setpoint, 1)
       << ",\"power_kw\":" << num(s.power_kw, 2)
+      << ",\"h2_consumed_g\":" << num(s.h2_consumed_g, 2)
+      << ",\"energy_wh\":" << num(s.energy_wh, 1)
+      << ",\"stack_efficiency_pct\":" << num(s.stack_efficiency_pct, 1)
       << ",\"readings\":{";
     for (std::size_t i = 0; i < SENSOR_COUNT; ++i) {
         j << (i ? "," : "") << '"' << SENSOR_NAMES[i]

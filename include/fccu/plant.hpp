@@ -45,6 +45,12 @@ public:
     void set_stack_temp(double c) { stack_temp_ = c; }
     void set_anode_pressure(double bar) { anode_pressure_ = bar; }
 
+    // run energy accounting: H2 drawn by the stack (reaction + recirc loss,
+    // purge vent excluded) and electrical energy delivered
+    double h2_consumed_mol() const { return h2_consumed_mol_; }
+    double energy_wh() const { return energy_wh_; }
+    void reset_energy_counters() { h2_consumed_mol_ = 0.0; energy_wh_ = 0.0; }
+
 private:
     HydrogenTank tank_;
     H2Valve h2_valve_;
@@ -58,6 +64,8 @@ private:
     double current_ = 0.0;
     double voltage_ = 0.0;
     double h2_flow_ = 0.0;
+    double h2_consumed_mol_ = 0.0;
+    double energy_wh_ = 0.0;
     bool cooling_blocked_ = false; // fault injection: coolant loop failure
 };
 

@@ -48,6 +48,9 @@ struct Snapshot {
     double demand_pct = 0.0;
     double current_setpoint = 0.0;
     double power_kw = 0.0;
+    double h2_consumed_g = 0.0;      // this run (reset on PURGE entry)
+    double energy_wh = 0.0;
+    double stack_efficiency_pct = 0.0;  // vs LHV of H2 drawn by the stack
     Readings readings;
     double h2_valve = 0.0, compressor = 0.0, recirc_pump = 0.0, cooling = 0.0;
     bool cooling_blocked = false;
@@ -104,6 +107,7 @@ private:
 
     double t_ = 0.0;
     long tick_ = 0;
+    State prev_state_ = State::off;
     double demand_pct_ = 0.0;
     Readings readings_;
     Command last_command_;

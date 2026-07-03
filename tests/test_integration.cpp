@@ -156,6 +156,26 @@ TEST_CASE("stuck sensor is detected while running") {
     CHECK(sim.safety().fault()->reason == "sensor stuck: coolant_temp");
 }
 
+TEST_CASE("energy accounting tracks a run and resets on the next purge") {
+    Simulation sim;
+    start_to_running(sim);
+    sim.set_demand(60.0);
+    sim.run_for(10.0);
+    CHECK(sim.plant().h2_consumed_mol() > 0.5);
+    CHECK(sim.plant().energy_wh() > 20.0);
+    // PEM stacks run roughly 45-65% of LHV at moderate load
+    double eff = sim.plant().energy_wh() / (sim.plant().h2_consumed_mol() * 67.17);
+    CHECK(eff > 0.35);
+    CHECK(eff < 0.75);
+
+    sim.command("stop");
+    REQUIRE(run_until(sim, [](Simulation& s) { return s.state() == State::off; },
+                      10.0));
+    sim.command("start");
+    sim.run_for(0.1);  // entered PURGE: counters must have reset
+    CHECK(sim.plant().h2_consumed_mol() < 0.01);
+}
+
 TEST_CASE("overheat recovery needs cooldown first") {
     Simulation sim;
     start_to_running(sim);

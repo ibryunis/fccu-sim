@@ -42,6 +42,10 @@ std::string Simulation::step_locked() {
     safety_.update(t_, TICK_DT, readings_);
     fsm_.update(TICK_DT, readings_.anode_pressure, readings_.coolant_temp,
                 safety_.latched());
+    if (fsm_.state() == State::purge && prev_state_ != State::purge) {
+        plant_.reset_energy_counters();  // new run starts at the purge edge
+    }
+    prev_state_ = fsm_.state();
     if (fsm_.timeout_reason() && !safety_.latched()) {
         safety_.trip(*fsm_.timeout_reason(), readings_.anode_pressure, 0.0, t_);
     }
@@ -133,6 +137,11 @@ Snapshot Simulation::snapshot() const {
     s.demand_pct = demand_pct_;
     s.current_setpoint = control_.current_setpoint();
     s.power_kw = plant_.voltage() * plant_.current() / 1000.0;
+    s.h2_consumed_g = plant_.h2_consumed_mol() * 2.016;
+    s.energy_wh = plant_.energy_wh();
+    // LHV of H2: 241.8 kJ/mol = 67.17 Wh/mol (spec sheets quote LHV)
+    double lhv_wh = plant_.h2_consumed_mol() * 67.17;
+    s.stack_efficiency_pct = lhv_wh > 1e-6 ? plant_.energy_wh() / lhv_wh * 100.0 : 0.0;
     s.readings = readings_;
     s.h2_valve = plant_.h2_valve().position();
     s.compressor = plant_.compressor().position();
