@@ -56,6 +56,7 @@ void ScenarioRunner::advance() {
     {
         std::scoped_lock lock(mutex_);
         if (!report_.running) return;
+        ++report_.total_ticks;
     }
     ++ticks_in_phase_;
     Snapshot s = sim_.snapshot();
@@ -133,6 +134,10 @@ void ScenarioRunner::advance() {
             break;
         }
         log(true, std::format("injecting fault: {}", FAULT_NAMES[fault_kind_]));
+        {
+            std::scoped_lock lock(mutex_);
+            report_.fault_kind = fault_kind_;
+        }
         enter(Phase::wait_fault, window);
         break;
     }
@@ -141,6 +146,10 @@ void ScenarioRunner::advance() {
         if (s.state == State::fault && s.latched) {
             log(true, std::format("latched in {} ticks: {}", ticks_in_phase_,
                                   s.fault ? s.fault->describe() : "?"));
+            {
+                std::scoped_lock lock(mutex_);
+                report_.latch_ticks = ticks_in_phase_;
+            }
             enter(Phase::reset_refused, 0);
         } else if (ticks_in_phase_ > deadline_) {
             fail_and_finish("SDC did not latch within the expected window");

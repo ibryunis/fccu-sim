@@ -41,6 +41,9 @@ public:
         bool done = false;
         bool pass = false;
         std::uint32_t seed = 0;
+        int fault_kind = -1;      // 0 overheat, 1 spike, 2 disconnect, 3 stuck
+        long latch_ticks = -1;    // injection -> latch, in ticks
+        long total_ticks = 0;
         std::vector<Line> lines;
     };
 

@@ -168,6 +168,32 @@ human must re-arm.
   `FAULT: coolant overtemp: 81.3 vs limit 80.0 at t=150.1s`. Vague fault
   reporting costs real teams days; this makes the cause readable at a glance.
 
+## Verification campaign
+
+`fccu_campaign` runs the randomized acceptance scenario N times in parallel
+(each worker owns a complete simulation - no shared state) and aggregates
+latch-latency statistics per fault class. Any failing seed reproduces
+exactly via `--runs 1 --seed <s>` or the dashboard AUTO TEST button.
+
+Sample result (2000 scenarios, 12 workers, Ryzen laptop):
+
+```
+passed         2000 (100.00%)
+sim time       37.2 h (13380849 ticks)
+wall time      1.0 s  (132093x realtime, 13.2 Mticks/s)
+
+latch latency from injection (ms, sim time)
+fault                   n      p50      p95      max
+overheat              525    18150    21250    23010
+pressure spike        485      500      500      500
+sensor disconnect     475      500      500      500
+sensor stuck          515     1000     1000     1000
+```
+
+Spike/disconnect sit exactly on the 500 ms persistence window and stuck on
+its 1000 ms window; overheat latency is dominated by the physical
+temperature climb, not the monitor.
+
 ## Known limitations
 
 - Thermal mass is set low (8 kJ/K) so warm-up takes ~25 s instead of

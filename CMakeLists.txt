@@ -27,6 +27,11 @@ if(WIN32)
     target_link_libraries(fccu_sim PRIVATE ws2_32)
 endif()
 
+add_executable(fccu_campaign src/campaign.cpp)
+target_include_directories(fccu_campaign PRIVATE src)
+target_link_libraries(fccu_campaign PRIVATE fccu_core)
+target_compile_options(fccu_campaign PRIVATE -Wall -Wextra)
+
 add_executable(fccu_tests
     tests/test_fuel_cell.cpp
     tests/test_tank.cpp
