@@ -18,8 +18,8 @@ target_include_directories(fccu_core PUBLIC include)
 target_link_libraries(fccu_core PUBLIC Threads::Threads)
 target_compile_options(fccu_core PRIVATE -Wall -Wextra)
 
-add_executable(fccu_sim src/main.cpp)
-target_include_directories(fccu_sim PRIVATE third_party)
+add_executable(fccu_sim src/main.cpp src/http_api.cpp)
+target_include_directories(fccu_sim PRIVATE src third_party)
 target_link_libraries(fccu_sim PRIVATE fccu_core)
 target_compile_options(fccu_sim PRIVATE -Wall -Wextra)
 if(WIN32)
@@ -35,11 +35,16 @@ add_executable(fccu_tests
     tests/test_control_loop.cpp
     tests/test_safety.cpp
     tests/test_integration.cpp
+    tests/test_http.cpp
+    src/http_api.cpp
     third_party/catch_amalgamated.cpp
 )
-target_include_directories(fccu_tests PRIVATE third_party)
+target_include_directories(fccu_tests PRIVATE src third_party)
 target_link_libraries(fccu_tests PRIVATE fccu_core)
 target_compile_options(fccu_tests PRIVATE -Wall -Wextra)
+if(WIN32)
+    target_link_libraries(fccu_tests PRIVATE ws2_32)
+endif()
 
 enable_testing()
 add_test(NAME unit COMMAND fccu_tests)

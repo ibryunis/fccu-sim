@@ -24,11 +24,16 @@ Both build on first run, start the server, and open http://localhost:8000.
 Press START, move the demand slider, inject faults, reset the latch.
 Every run logs CSV at 10 Hz to `logs/`.
 
-Tests:
+Tests (also run on every push by GitHub Actions, `.github/workflows/ci.yml`):
 
 ```
-cmake --build build && build\fccu_tests
+cmake --build build && ctest --test-dir build --output-on-failure
 ```
+
+Four layers: unit (physics, FSM table, PID, safety timing), closed-loop
+(control against the real plant), integration (whole sim headless: startup,
+faults, latch/reset), and end-to-end HTTP (real server + real client:
+status codes, input rejection, SSE frame shape, refused-reset 409).
 
 ## Architecture
 
@@ -45,8 +50,9 @@ include/fccu/          public headers - no UI include anywhere in here
   safety.hpp           SDC-style latching safety monitor
   datalog.hpp          RAII CSV logger                       (header-only)
   runtime.hpp          100 Hz tick + thread-safe API + Snapshot
-src/                   implementations + main.cpp (HTTP/SSE/JSON boundary)
-tests/                 Catch2: 182 assertions in 73 test cases
+src/                   implementations; http_api.cpp is the HTTP/SSE/JSON
+                       boundary (shared by main.cpp and the HTTP test)
+tests/                 Catch2: 223 assertions in 81 test cases
 ui/static/index.html   dashboard, single file, no build step, offline
 third_party/           cpp-httplib, Catch2 amalgamated (vendored)
 ```
