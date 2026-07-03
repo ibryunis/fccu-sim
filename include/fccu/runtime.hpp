@@ -18,6 +18,7 @@
 #include <atomic>
 #include <cstdint>
 #include <filesystem>
+#include <memory>
 #include <mutex>
 #include <optional>
 #include <string>
@@ -66,6 +67,8 @@ enum class InjectKind {
     pressure_spike, overheat, clear_overheat, sensor_fail, sensor_repair
 };
 
+class ScenarioRunner;
+
 class Simulation {
 public:
     // pass a directory to enable CSV logging, nullopt to disable (tests)
@@ -80,13 +83,25 @@ public:
 
     // --- thread-safe UI / command API -----------------------------------
     enum class CommandResult { ok, refused, unknown };
+    // manual (ui) calls are refused while an autotest scenario is running,
+    // so a stray click cannot corrupt the verdict; the runner authenticates
+    // as autotest and goes through the exact same code paths
+    enum class Auth { ui, autotest };
 
-    void set_demand(double pct);  // non-finite values are rejected
+    // returns false when rejected (non-finite value or UI locked)
+    bool set_demand(double pct, Auth auth = Auth::ui);
     // "start" | "stop" | "reset"; reset is refused while a cause persists
-    CommandResult command(std::string_view name);
-    void inject(InjectKind kind, SensorId sensor = SensorId::tank_pressure,
-                FailureMode mode = FailureMode::none);
+    CommandResult command(std::string_view name, Auth auth = Auth::ui);
+    // returns false when the UI is locked by a running autotest
+    bool inject(InjectKind kind, SensorId sensor = SensorId::tank_pressure,
+                FailureMode mode = FailureMode::none, Auth auth = Auth::ui);
     Snapshot snapshot() const;  // locks, copies, unlocks - no I/O under lock
+
+    // --- autotest ----------------------------------------------------------
+    bool start_autotest(std::uint32_t seed);  // false while one is running
+    void advance_autotest();                  // sim thread, no sim lock held
+    void unlock_ui();                         // called by the runner on finish
+    const ScenarioRunner& autotest() const { return *autotest_; }
 
     // --- single-threaded use (tests) -------------------------------------
     void step();
@@ -120,6 +135,8 @@ private:
     std::optional<CsvLogger> logger_;
     std::filesystem::path log_path_;
     std::atomic<long> overruns_{0};
+    std::unique_ptr<ScenarioRunner> autotest_;  // complete type in runtime.cpp
+    std::atomic<bool> ui_locked_{false};
 
     // fixed rings, written only by the sim thread (~20 s of history at 100 Hz)
     static constexpr std::size_t TIMING_RING = 2048;

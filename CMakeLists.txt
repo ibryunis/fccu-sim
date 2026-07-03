@@ -13,6 +13,7 @@ add_library(fccu_core STATIC
     src/control_loop.cpp
     src/safety.cpp
     src/runtime.cpp
+    src/scenario_runner.cpp
 )
 target_include_directories(fccu_core PUBLIC include)
 target_link_libraries(fccu_core PUBLIC Threads::Threads)
@@ -35,6 +36,7 @@ add_executable(fccu_tests
     tests/test_control_loop.cpp
     tests/test_safety.cpp
     tests/test_integration.cpp
+    tests/test_scenario.cpp
     tests/test_http.cpp
     src/http_api.cpp
     third_party/catch_amalgamated.cpp

@@ -6,6 +6,7 @@
 #include <format>
 
 #include "fccu/fuel_cell.hpp"
+#include "scenario/scenario_runner.hpp"
 
 namespace fccu {
 
@@ -17,7 +18,8 @@ static std::string timestamp_name() {
                        std::chrono::floor<std::chrono::seconds>(now));
 }
 
-Simulation::Simulation(std::optional<std::filesystem::path> log_dir) {
+Simulation::Simulation(std::optional<std::filesystem::path> log_dir)
+    : autotest_(std::make_unique<ScenarioRunner>(*this)) {
     if (log_dir) {
         log_path_ = *log_dir / timestamp_name();
         logger_.emplace(log_path_,
@@ -87,15 +89,18 @@ void Simulation::run_for(double seconds) {
     for (int i = 0; i < n; ++i) step();
 }
 
-void Simulation::set_demand(double pct) {
+bool Simulation::set_demand(double pct, Auth auth) {
+    if (auth == Auth::ui && ui_locked_.load()) return false;
     // NaN passes through std::clamp (comparisons are false) and would poison
     // the whole plant integration irrecoverably - reject it at the boundary
-    if (!std::isfinite(pct)) return;
+    if (!std::isfinite(pct)) return false;
     std::scoped_lock lock(mutex_);
     demand_pct_ = std::clamp(pct, 0.0, 100.0);
+    return true;
 }
 
-Simulation::CommandResult Simulation::command(std::string_view name) {
+Simulation::CommandResult Simulation::command(std::string_view name, Auth auth) {
+    if (auth == Auth::ui && ui_locked_.load()) return CommandResult::refused;
     std::scoped_lock lock(mutex_);
     if (name == "start") {
         fsm_.request_start();
@@ -110,7 +115,9 @@ Simulation::CommandResult Simulation::command(std::string_view name) {
     return CommandResult::ok;
 }
 
-void Simulation::inject(InjectKind kind, SensorId sensor, FailureMode mode) {
+bool Simulation::inject(InjectKind kind, SensorId sensor, FailureMode mode,
+                        Auth auth) {
+    if (auth == Auth::ui && ui_locked_.load()) return false;
     std::scoped_lock lock(mutex_);
     switch (kind) {
     case InjectKind::pressure_spike: plant_.tank().inject_heat(80.0); break;
@@ -119,6 +126,21 @@ void Simulation::inject(InjectKind kind, SensorId sensor, FailureMode mode) {
     case InjectKind::sensor_fail:    sensors_.fail(sensor, mode); break;
     case InjectKind::sensor_repair:  sensors_.repair(sensor); break;
     }
+    return true;
+}
+
+bool Simulation::start_autotest(std::uint32_t seed) {
+    if (!autotest_->start(seed)) return false;
+    ui_locked_.store(true);
+    return true;
+}
+
+void Simulation::advance_autotest() {
+    autotest_->advance();
+}
+
+void Simulation::unlock_ui() {
+    ui_locked_.store(false);
 }
 
 Snapshot Simulation::snapshot() const {
@@ -182,6 +204,7 @@ void Simulation::start_thread() {
                 }
             }
             prev_wake = t0;
+            advance_autotest();  // same thread as the tick, sim lock not held
             next += period;  // absolute deadline: jitter never accumulates
             if (next < clock::now()) {
                 next = clock::now();  // fell behind: resync, don't burst-catch-up

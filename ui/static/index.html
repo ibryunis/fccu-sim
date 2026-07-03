@@ -149,6 +149,7 @@
       <button class="start" onclick="cmd('start')">START</button>
       <button onclick="cmd('stop')">STOP</button>
       <button class="reset" onclick="cmd('reset')">RESET LATCH</button>
+      <button id="autotest-btn" onclick="startAutotest()">AUTO TEST</button>
       <span class="sep"></span>
       <span>Demand <input type="range" id="dem" min="0" max="100" value="0"
         oninput="demand(this.value)"> <b id="demv"
@@ -205,6 +206,13 @@
   <div class="panel" style="flex:1">
     <h2>Fault history</h2>
     <div id="history">none</div>
+  </div>
+</div>
+
+<div class="row" id="autotest-panel" style="display:none">
+  <div class="panel" style="flex:1">
+    <h2>Auto test <span id="at-verdict"></span></h2>
+    <div id="at-lines" style="font-size:12px;font-family:Consolas,monospace;line-height:1.7"></div>
   </div>
 </div>
 
@@ -383,6 +391,30 @@ function update(s) {
   $('history').innerHTML = s.fault_history.length
     ? s.fault_history.map(f => '<div>' + f + '</div>').join('') : 'none';
 }
+
+let atPolling = null;
+async function pollAutotest() {
+  const rep = await (await fetch('/api/autotest')).json();
+  const panel = document.getElementById('autotest-panel');
+  if (!rep.lines.length && !rep.running) return;
+  panel.style.display = 'flex';
+  document.getElementById('at-verdict').innerHTML = rep.running
+    ? '<span style="color:var(--accent)">running&hellip; (seed ' + rep.seed + ')</span>'
+    : rep.pass ? '<span style="color:var(--ok)">PASS (seed ' + rep.seed + ')</span>'
+               : '<span style="color:var(--bad)">FAIL (seed ' + rep.seed + ')</span>';
+  document.getElementById('at-lines').innerHTML = rep.lines.map(l =>
+    `<div style="color:${l.pass ? 'var(--dim)' : 'var(--bad)'}">` +
+    `[t=${l.t.toFixed(1)}s] ${l.pass ? 'PASS' : 'FAIL'}  ${l.text}</div>`).join('');
+  document.getElementById('autotest-btn').disabled = rep.running;
+  if (!rep.running && atPolling) { clearInterval(atPolling); atPolling = null; }
+}
+async function startAutotest() {
+  const r = await fetch('/api/autotest', {method: 'POST'});
+  if (r.status === 409) return;
+  if (!atPolling) atPolling = setInterval(pollAutotest, 500);
+  pollAutotest();
+}
+pollAutotest();  // show a previous run's report after page reload
 
 const es = new EventSource('/api/events');   // auto-reconnects on drop
 es.onmessage = e => {

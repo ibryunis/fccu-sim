@@ -10,10 +10,22 @@
 #include <stdexcept>
 #include <thread>
 
+#include <random>
+
 #include "httplib.h"
+#include "scenario/scenario_runner.hpp"
 
 namespace fccu {
 namespace {
+
+std::string escape_json(const std::string& s) {
+    std::string out;
+    for (char c : s) {
+        if (c == '"' || c == '\\') out.push_back('\\');
+        out.push_back(c);
+    }
+    return out;
+}
 
 // --- string <-> enum maps (UI boundary only) --------------------------------
 
@@ -139,10 +151,42 @@ void register_api(httplib::Server& svr, Simulation& sim,
             // stod("nan") parses without throwing - reject non-finite here too
             double v = std::stod(req.get_param_value("value"));
             if (!std::isfinite(v)) throw std::invalid_argument("non-finite");
-            sim.set_demand(v);
+            if (!sim.set_demand(v)) res.status = 409;  // autotest holds the UI
         } catch (const std::exception&) {
             res.status = 400;
         }
+    });
+
+    svr.Post("/api/autotest", [&sim](const httplib::Request& req, httplib::Response& res) {
+        std::uint32_t seed;
+        try {
+            seed = static_cast<std::uint32_t>(std::stoul(req.get_param_value("seed")));
+        } catch (const std::exception&) {
+            seed = std::random_device{}();
+        }
+        if (!sim.start_autotest(seed)) {
+            res.status = 409;
+            return;
+        }
+        res.set_content(std::format("{{\"started\":true,\"seed\":{}}}", seed),
+                        "application/json");
+    });
+
+    svr.Get("/api/autotest", [&sim](const httplib::Request&, httplib::Response& res) {
+        auto rep = sim.autotest().report();
+        std::ostringstream j;
+        j << "{\"running\":" << (rep.running ? "true" : "false")
+          << ",\"done\":" << (rep.done ? "true" : "false")
+          << ",\"pass\":" << (rep.pass ? "true" : "false")
+          << ",\"seed\":" << rep.seed << ",\"lines\":[";
+        for (std::size_t i = 0; i < rep.lines.size(); ++i) {
+            const auto& l = rep.lines[i];
+            j << (i ? "," : "") << std::format(
+                "{{\"t\":{:.1f},\"pass\":{},\"text\":\"{}\"}}",
+                l.t, l.pass ? "true" : "false", escape_json(l.text));
+        }
+        j << "]}";
+        res.set_content(j.str(), "application/json");
     });
 
     svr.Post("/api/command", [&sim](const httplib::Request& req, httplib::Response& res) {
@@ -155,12 +199,13 @@ void register_api(httplib::Server& svr, Simulation& sim,
 
     svr.Post("/api/inject", [&sim](const httplib::Request& req, httplib::Response& res) {
         const std::string kind = req.get_param_value("kind");
+        bool accepted = true;
         if (kind == "pressure_spike") {
-            sim.inject(InjectKind::pressure_spike);
+            accepted = sim.inject(InjectKind::pressure_spike);
         } else if (kind == "overheat") {
-            sim.inject(InjectKind::overheat);
+            accepted = sim.inject(InjectKind::overheat);
         } else if (kind == "clear_overheat") {
-            sim.inject(InjectKind::clear_overheat);
+            accepted = sim.inject(InjectKind::clear_overheat);
         } else if (kind == "sensor_fail" || kind == "sensor_repair") {
             auto sensor = sensor_from(req.get_param_value("sensor"));
             auto mode = mode_from(req.get_param_value("mode"));
@@ -168,14 +213,14 @@ void register_api(httplib::Server& svr, Simulation& sim,
                 res.status = 400;
                 return;
             }
-            if (kind == "sensor_fail") {
-                sim.inject(InjectKind::sensor_fail, *sensor, *mode);
-            } else {
-                sim.inject(InjectKind::sensor_repair, *sensor);
-            }
+            accepted = kind == "sensor_fail"
+                ? sim.inject(InjectKind::sensor_fail, *sensor, *mode)
+                : sim.inject(InjectKind::sensor_repair, *sensor);
         } else {
             res.status = 400;
+            return;
         }
+        if (!accepted) res.status = 409;  // autotest holds the UI
     });
 }
 
