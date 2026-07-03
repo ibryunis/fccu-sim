@@ -129,6 +129,15 @@ int main(int argc, char** argv) {
         std::printf("\n");
     }
 
+    std::ofstream csv("campaign_runs.csv");
+    csv << "seed,pass,fault,latch_ms,ticks\n";
+    for (const auto& r : results) {
+        csv << r.seed << ',' << r.pass << ','
+            << (r.fault_kind >= 0 ? FAULT_NAMES[r.fault_kind] : "none") << ','
+            << (r.latch_ticks >= 0 ? r.latch_ticks * 10 : -1) << ','
+            << r.ticks << '\n';
+    }
+
     std::ofstream json("campaign_report.json");
     json << "{\"runs\":" << runs << ",\"passed\":" << passed
          << ",\"wall_s\":" << wall_s << ",\"total_ticks\":" << total_ticks
