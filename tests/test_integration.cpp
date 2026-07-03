@@ -119,6 +119,43 @@ TEST_CASE("reset refused while fault present, accepted after repair") {
     start_to_running(sim);  // and the car can start again
 }
 
+TEST_CASE("NaN demand is rejected, plant stays finite") {
+    Simulation sim;
+    start_to_running(sim);
+    sim.set_demand(50.0);
+    sim.run_for(3.0);
+    sim.set_demand(std::nan(""));  // must not poison the plant
+    sim.run_for(2.0);
+    CHECK(std::isfinite(sim.plant().current()));
+    CHECK(std::isfinite(sim.plant().anode_pressure()));
+    CHECK(std::isfinite(sim.plant().stack_temp()));
+    CHECK(sim.plant().current() > 100.0);  // still tracking the last demand
+}
+
+TEST_CASE("empty tank: pressurize timeout latches the SDC") {
+    Simulation sim;
+    double taken = sim.plant().tank().draw(1e9);
+    // tank model cools linearly per mol drawn; restore temp so only the
+    // empty-tank effect (no flow -> no pressure rise) is under test
+    sim.plant().tank().inject_heat(taken * HydrogenTank::COOL_PER_MOL);
+    sim.command("start");
+    REQUIRE(run_until(sim, [](Simulation& s) { return s.state() == State::fault; },
+                      20.0));
+    REQUIRE(sim.safety().latched());
+    CHECK(sim.safety().fault()->reason.find("pressurize timeout")
+          != std::string::npos);
+}
+
+TEST_CASE("stuck sensor is detected while running") {
+    Simulation sim;
+    start_to_running(sim);
+    sim.run_for(2.0);
+    sim.inject(InjectKind::sensor_fail, SensorId::coolant_temp, FailureMode::stuck);
+    REQUIRE(run_until(sim, [](Simulation& s) { return s.state() == State::fault; },
+                      5.0));
+    CHECK(sim.safety().fault()->reason == "sensor stuck: coolant_temp");
+}
+
 TEST_CASE("overheat recovery needs cooldown first") {
     Simulation sim;
     start_to_running(sim);

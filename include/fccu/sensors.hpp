@@ -9,6 +9,7 @@
 // pointer-to-member table in types.hpp: no string keys, no heap.
 #pragma once
 
+#include <algorithm>
 #include <array>
 #include <limits>
 #include <random>
@@ -55,7 +56,10 @@ public:
             break;
         }
         std::normal_distribution<double> noise(0.0, cfg_.noise_sigma);
-        last_good_ = true_value + noise(rng);
+        // a real transducer rails at its range; genuine over-range physics
+        // must trip the hard limits, not the wiring-fault plausibility check
+        last_good_ = std::clamp(true_value + noise(rng),
+                                cfg_.range_lo, cfg_.range_hi);
         return last_good_;
     }
 

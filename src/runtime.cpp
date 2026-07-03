@@ -33,7 +33,7 @@ Simulation::~Simulation() {
     // jthread destructor joins
 }
 
-void Simulation::step_locked() {
+std::string Simulation::step_locked() {
     t_ += TICK_DT;
     ++tick_;
 
@@ -50,11 +50,11 @@ void Simulation::step_locked() {
     plant_.apply(last_command_);
     plant_.step(TICK_DT, last_command_.current_request, last_command_.purge_open);
 
-    if (logger_ && tick_ % LOG_DECIMATION == 0) log_row();
+    return logger_ && tick_ % LOG_DECIMATION == 0 ? log_row() : std::string{};
 }
 
-void Simulation::log_row() {
-    logger_->row(std::format(
+std::string Simulation::log_row() const {
+    return std::format(
         "{:.2f},{},{:.0f},{:.2f},{:d},"
         "{:.4f},{:.4f},{:.4f},{:.4f},{:.4f},{:.4f},{:.4f},"
         "{:.4f},{:.4f},{:.4f},{:.4f}",
@@ -64,12 +64,18 @@ void Simulation::log_row() {
         readings_.stack_current, readings_.coolant_temp, readings_.anode_pressure,
         readings_.h2_flow,
         plant_.h2_valve().position(), plant_.compressor().position(),
-        plant_.recirc_pump().position(), plant_.cooling().position()));
+        plant_.recirc_pump().position(), plant_.cooling().position());
 }
 
 void Simulation::step() {
-    std::scoped_lock lock(mutex_);
-    step_locked();
+    std::string row;
+    {
+        std::scoped_lock lock(mutex_);
+        row = step_locked();
+    }
+    // file I/O outside the lock: a slow flush must never block UI calls.
+    // Only this thread writes the log, so no lock is needed for logger_.
+    if (!row.empty()) logger_->row(row);
 }
 
 void Simulation::run_for(double seconds) {
@@ -78,22 +84,26 @@ void Simulation::run_for(double seconds) {
 }
 
 void Simulation::set_demand(double pct) {
+    // NaN passes through std::clamp (comparisons are false) and would poison
+    // the whole plant integration irrecoverably - reject it at the boundary
+    if (!std::isfinite(pct)) return;
     std::scoped_lock lock(mutex_);
     demand_pct_ = std::clamp(pct, 0.0, 100.0);
 }
 
-bool Simulation::command(std::string_view name) {
+Simulation::CommandResult Simulation::command(std::string_view name) {
     std::scoped_lock lock(mutex_);
     if (name == "start") {
         fsm_.request_start();
     } else if (name == "stop") {
         fsm_.request_stop();
     } else if (name == "reset") {
-        if (safety_.reset(readings_)) fsm_.request_reset();
+        if (!safety_.reset(readings_)) return CommandResult::refused;
+        fsm_.request_reset();
     } else {
-        return false;
+        return CommandResult::unknown;
     }
-    return true;
+    return CommandResult::ok;
 }
 
 void Simulation::inject(InjectKind kind, SensorId sensor, FailureMode mode) {
@@ -117,8 +127,9 @@ Snapshot Simulation::snapshot() const {
     const auto& hist = safety_.history();
     std::size_t first = hist.size() > 5 ? hist.size() - 5 : 0;
     for (std::size_t i = first; i < hist.size(); ++i) {
-        s.fault_history.push_back(hist[i].describe());
+        s.fault_history.push_back(hist[i]);  // describe() happens outside the lock
     }
+    s.overruns = overruns_.load();
     s.demand_pct = demand_pct_;
     s.current_setpoint = control_.current_setpoint();
     s.power_kw = plant_.voltage() * plant_.current() / 1000.0;
@@ -144,7 +155,10 @@ void Simulation::start_thread() {
         while (!stop.stop_requested()) {
             step();
             next += period;  // absolute deadline: jitter never accumulates
-            if (next < clock::now()) next = clock::now();  // fell behind: resync
+            if (next < clock::now()) {
+                next = clock::now();  // fell behind: resync, don't burst-catch-up
+                overruns_.fetch_add(1);  // but never silently - telemetry shows it
+            }
             std::this_thread::sleep_until(next);
         }
     });

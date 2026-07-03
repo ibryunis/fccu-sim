@@ -15,6 +15,7 @@
 // the lock is never held across I/O. UI threads get a Snapshot by value.
 #pragma once
 
+#include <atomic>
 #include <filesystem>
 #include <mutex>
 #include <optional>
@@ -42,7 +43,8 @@ struct Snapshot {
     State state = State::off;
     bool latched = false;
     std::optional<FaultRecord> fault;
-    std::vector<std::string> fault_history;  // last 5, described
+    std::vector<FaultRecord> fault_history;  // last 5; described outside the lock
+    long overruns = 0;                       // ticks where the loop fell behind
     double demand_pct = 0.0;
     double current_setpoint = 0.0;
     double power_kw = 0.0;
@@ -69,8 +71,11 @@ public:
     void start_thread();
 
     // --- thread-safe UI / command API -----------------------------------
-    void set_demand(double pct);
-    bool command(std::string_view name);  // "start" | "stop" | "reset"
+    enum class CommandResult { ok, refused, unknown };
+
+    void set_demand(double pct);  // non-finite values are rejected
+    // "start" | "stop" | "reset"; reset is refused while a cause persists
+    CommandResult command(std::string_view name);
     void inject(InjectKind kind, SensorId sensor = SensorId::tank_pressure,
                 FailureMode mode = FailureMode::none);
     Snapshot snapshot() const;  // locks, copies, unlocks - no I/O under lock
@@ -88,8 +93,8 @@ public:
     const std::filesystem::path& log_path() const { return log_path_; }
 
 private:
-    void step_locked();
-    void log_row();
+    std::string step_locked();  // returns the CSV row to write, or empty
+    std::string log_row() const;
 
     Plant plant_;
     SensorSuite sensors_;
@@ -105,6 +110,7 @@ private:
 
     std::optional<CsvLogger> logger_;
     std::filesystem::path log_path_;
+    std::atomic<long> overruns_{0};
 
     mutable std::mutex mutex_;
     std::jthread thread_;  // last member: joins before the rest is destroyed

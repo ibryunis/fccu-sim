@@ -65,16 +65,38 @@ SafetyMonitor::evaluate(const Readings& r) const {
 bool SafetyMonitor::update(double t, double dt, const Readings& r) {
     auto evals = evaluate(r);
     for (std::size_t i = 0; i < CHECK_COUNT; ++i) {
-        if (!evals[i].violated) {
-            accum_[i] = 0.0;
-            continue;
+        double before = accum_[i];
+        if (evals[i].violated) {
+            accum_[i] = std::min(before + dt, defs_[i].persistence_s);
+        } else {
+            // leak instead of zeroing: a marginal fault dithering across its
+            // limit through sensor noise still trips (>75% violated samples);
+            // the cap makes the trip fire exactly once per violation episode
+            accum_[i] = std::max(before - LEAK_RATE * dt, 0.0);
         }
-        accum_[i] += dt;
-        if (accum_[i] >= defs_[i].persistence_s) {
+        if (before < defs_[i].persistence_s && accum_[i] >= defs_[i].persistence_s) {
             trip(defs_[i].name, evals[i].value, defs_[i].limit, t);
         }
     }
+    update_stuck(t, dt, r);
     return latched_;
+}
+
+void SafetyMonitor::update_stuck(double t, double dt, const Readings& r) {
+    for (std::size_t i = 0; i < SENSOR_COUNT; ++i) {
+        double v = r.*READING_FIELDS[i];
+        const SensorConfig& cfg = SENSOR_CONFIGS[i];
+        bool frozen = !std::isnan(v) && has_prev_ && v == stuck_prev_[i]
+                   && v > cfg.range_lo && v < cfg.range_hi;
+        double before = stuck_accum_[i];
+        stuck_accum_[i] = frozen ? std::min(before + dt, PERSIST_STUCK)
+                                 : std::max(before - LEAK_RATE * dt, 0.0);
+        if (before < PERSIST_STUCK && stuck_accum_[i] >= PERSIST_STUCK) {
+            trip(std::format("sensor stuck: {}", SENSOR_NAMES[i]), v, v, t);
+        }
+        if (!std::isnan(v)) stuck_prev_[i] = v;
+    }
+    has_prev_ = true;
 }
 
 void SafetyMonitor::trip(std::string reason, double value, double limit, double t) {
@@ -94,10 +116,17 @@ bool SafetyMonitor::any_violation(const Readings& r) const {
 }
 
 bool SafetyMonitor::reset(const Readings& r) {
+    // persistence-symmetric: one lucky low-noise sample must not re-arm the
+    // system - every accumulator has to drain (leak) to zero first
     if (any_violation(r)) return false;
+    for (double a : accum_) {
+        if (a > 0.0) return false;
+    }
+    for (double a : stuck_accum_) {
+        if (a > 0.0) return false;
+    }
     latched_ = false;
     fault_.reset();
-    accum_.fill(0.0);
     return true;
 }
 

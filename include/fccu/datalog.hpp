@@ -9,25 +9,23 @@ namespace fccu {
 
 class CsvLogger {
 public:
-    static constexpr int FLUSH_EVERY = 50;
-
     CsvLogger(const std::filesystem::path& path, const std::string& header) {
         std::filesystem::create_directories(path.parent_path());
         file_.open(path);
         file_ << header << '\n';
     }
 
+    bool ok() const { return file_.is_open() && file_.good(); }
+
+    // flush per row: at 10 Hz the cost is nothing, and a Ctrl+C killed
+    // process loses no data - the end of the log is where the fault lives
     void row(const std::string& line) {
         file_ << line << '\n';
-        if (++pending_ >= FLUSH_EVERY) {
-            file_.flush();
-            pending_ = 0;
-        }
+        file_.flush();
     }
 
 private:
     std::ofstream file_;
-    int pending_ = 0;
 };
 
 } // namespace fccu

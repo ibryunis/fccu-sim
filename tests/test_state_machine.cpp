@@ -88,6 +88,17 @@ TEST_CASE("stop behaviour") {
         run(fsm, 3.1, NOMINAL);
         CHECK(fsm.state() == State::off);
     }
+    SECTION("start during SHUTDOWN is discarded - no self-restart") {
+        // SDC philosophy: after a commanded stop, restarting requires a fresh
+        // human action once the system is OFF; stale commands must not queue
+        StateMachine fsm = running_fsm();
+        fsm.request_stop();
+        fsm.update(DT, 2.0, 65.0, false);
+        REQUIRE(fsm.state() == State::shutdown);
+        fsm.request_start();
+        run(fsm, 3.1, NOMINAL);
+        CHECK(fsm.state() == State::off);  // did not restart itself
+    }
     SECTION("stop aborts startup") {
         StateMachine fsm;
         fsm.request_start();

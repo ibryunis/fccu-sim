@@ -73,9 +73,10 @@ std::string to_json(const Snapshot& s) {
     }
     j << ",\"fault_history\":[";
     for (std::size_t i = 0; i < s.fault_history.size(); ++i) {
-        j << (i ? "," : "") << '"' << s.fault_history[i] << '"';
+        j << (i ? "," : "") << '"' << s.fault_history[i].describe() << '"';
     }
-    j << "],\"demand_pct\":" << num(s.demand_pct, 0)
+    j << "],\"overruns\":" << s.overruns
+      << ",\"demand_pct\":" << num(s.demand_pct, 0)
       << ",\"current_setpoint\":" << num(s.current_setpoint, 1)
       << ",\"power_kw\":" << num(s.power_kw, 2)
       << ",\"readings\":{";
@@ -131,6 +132,9 @@ int main(int, char** argv) {
     }
 
     httplib::Server svr;
+    // each SSE connection occupies a worker for its lifetime; a bigger pool
+    // keeps command endpoints responsive with many dashboard tabs open
+    svr.new_task_queue = [] { return new httplib::ThreadPool(32); };
 
     svr.Get("/", [&dashboard](const httplib::Request&, httplib::Response& res) {
         res.set_content(dashboard, "text/html");
@@ -153,14 +157,21 @@ int main(int, char** argv) {
 
     svr.Post("/api/demand", [&sim](const httplib::Request& req, httplib::Response& res) {
         try {
-            sim.set_demand(std::stod(req.get_param_value("value")));
+            // stod("nan") parses without throwing - reject non-finite here too
+            double v = std::stod(req.get_param_value("value"));
+            if (!std::isfinite(v)) throw std::invalid_argument("non-finite");
+            sim.set_demand(v);
         } catch (const std::exception&) {
             res.status = 400;
         }
     });
 
     svr.Post("/api/command", [&sim](const httplib::Request& req, httplib::Response& res) {
-        if (!sim.command(req.get_param_value("name"))) res.status = 400;
+        switch (sim.command(req.get_param_value("name"))) {
+        case Simulation::CommandResult::ok: break;
+        case Simulation::CommandResult::refused: res.status = 409; break;
+        case Simulation::CommandResult::unknown: res.status = 400; break;
+        }
     });
 
     svr.Post("/api/inject", [&sim](const httplib::Request& req, httplib::Response& res) {
@@ -189,6 +200,9 @@ int main(int, char** argv) {
     });
 
     std::printf("FCCU simulator: http://localhost:8000\n");
-    svr.listen("127.0.0.1", 8000);
+    if (!svr.listen("127.0.0.1", 8000)) {
+        std::fprintf(stderr, "failed to bind port 8000 (already in use?)\n");
+        return 1;
+    }
     return 0;
 }

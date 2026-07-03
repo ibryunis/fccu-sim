@@ -132,16 +132,32 @@ Modelled on the FS shutdown circuit: de-energized is the safe state, a
 human must re-arm.
 
 - Persistence per FS EV 5.8.7: **500 ms** for pressure/voltage/current,
-  **1000 ms** for temperature. Violation must hold for the whole window;
-  one healthy sample resets the accumulator (noise immunity).
+  **1000 ms** for temperature. Accumulators are *leaky*, not hard-reset: a
+  clean sample drains at 3x the fill rate, so a brief transient never trips
+  but a marginal fault dithering across its limit through sensor noise
+  (>75% of samples violated) still does. A hard reset-to-zero would let a
+  real fault sitting just above a limit evade the window forever.
+- Frozen-signal detection: consecutive bit-identical readings for 1 s while
+  strictly inside the sensor range trip `sensor stuck: <name>`. Healthy
+  channels always wiggle with noise; rail-clamped values legitimately
+  repeat, so rails are exempt. Two documented blind spots: a sensor stuck
+  exactly at a rail is invisible to this check, and bit-identical
+  comparison only works with continuous noise - a real quantized ADC
+  produces identical consecutive codes routinely, so real firmware needs a
+  delta-band-over-time check instead.
 - Monitored: tank overpressure (400 bar), anode overpressure (3.0 bar),
   overcurrent (360 A), undervoltage under load (0.40 V/cell), coolant
   overtemp (80 degC), tank overtemp (60 degC), plus per-sensor plausibility
   (NaN = broken wire, out of range, with 2% tolerance past the rail so
   noise near zero is not a broken wire). Startup timeouts trip it too.
 - On trip: latch set, FSM forced to FAULT, hydrogen cut, cooling to 100%.
-  Reset is refused while any condition is still present. `update()` and
-  `reset()` share one `evaluate()` so they cannot disagree.
+  Reset is persistence-symmetric: refused until every accumulator has
+  drained to zero AND no instantaneous violation remains - one lucky
+  low-noise sample cannot re-arm the system. `update()` and `reset()` share
+  one `evaluate()` so they cannot disagree.
+- Fail-closed: the H2 valve commands 0 the moment the anode pressure
+  reading is NaN, instead of coasting open-loop on the setpoint for the
+  500 ms until plausibility trips.
 - Every trip records reason, value, limit, timestamp:
   `FAULT: coolant overtemp: 81.3 vs limit 80.0 at t=150.1s`. Vague fault
   reporting costs real teams days; this makes the cause readable at a glance.
@@ -152,8 +168,16 @@ human must re-arm.
   minutes; same dynamics, compressed timescale.
 - Gas composition is not tracked: the anode is assumed pure H2, so the
   stack shows open-circuit voltage even in OFF (physically: residual H2,
-  which would decay over minutes).
+  which would decay over minutes), and there is no nitrogen crossover -
+  which is why RUNNING has no periodic purge cycle and the air path has no
+  cathode feedback. Adding either would be dead code the plant model cannot
+  exercise.
 - Single lumped thermal node - stack and coolant share one temperature.
-- Stuck-sensor failures are injectable but not detected (a stuck value is
-  in range); detection needs rate-of-change or model-based checks.
-  Documented limitation rather than a half-built feature.
+- The telemetry `overruns` counter typically shows a few percent of ticks
+  missing their 10 ms deadline on Windows (scheduler granularity). The
+  loop resyncs rather than burst-catching-up, and the control law always
+  integrates a fixed TICK_DT, so behavior is unaffected - but sim time can
+  lag wall time slightly under a coarse system timer.
+- A START pressed during SHUTDOWN is deliberately discarded, not queued:
+  the car must never restart itself after a commanded stop. Covered by a
+  test that documents the decision.

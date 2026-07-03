@@ -19,8 +19,14 @@
 
 namespace fccu {
 
-inline constexpr double PERSIST_FAST = 0.5;  // s: pressure, voltage, current
-inline constexpr double PERSIST_TEMP = 1.0;  // s: temperature
+inline constexpr double PERSIST_FAST = 0.5;   // s: pressure, voltage, current
+inline constexpr double PERSIST_TEMP = 1.0;   // s: temperature
+inline constexpr double PERSIST_STUCK = 1.0;  // s: frozen-signal detection
+
+// clean samples drain accumulators at LEAK_RATE * dt instead of zeroing
+// them: a marginal fault dithering across its limit through sensor noise
+// still trips once >75% of samples violate, while brief transients never do
+inline constexpr double LEAK_RATE = 3.0;
 
 struct FaultRecord {
     std::string reason;
@@ -73,9 +79,18 @@ private:
     };
 
     std::array<Evaluation, CHECK_COUNT> evaluate(const Readings& r) const;
+    void update_stuck(double t, double dt, const Readings& r);
 
     std::array<CheckDef, CHECK_COUNT> defs_;
     std::array<double, CHECK_COUNT> accum_{};
+
+    // frozen-signal detection: consecutive bit-identical readings strictly
+    // inside the sensor range (healthy channels always wiggle with noise;
+    // rail-clamped values legitimately repeat, so rails are exempt)
+    std::array<double, SENSOR_COUNT> stuck_prev_{};
+    std::array<double, SENSOR_COUNT> stuck_accum_{};
+    bool has_prev_ = false;
+
     bool latched_ = false;
     std::optional<FaultRecord> fault_;   // primary (first) fault
     std::vector<FaultRecord> history_;

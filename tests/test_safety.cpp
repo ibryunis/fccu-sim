@@ -13,12 +13,17 @@ constexpr Readings HEALTHY{.tank_pressure = 350.0, .tank_temp = 25.0,
                            .coolant_temp = 65.0, .anode_pressure = 2.0,
                            .h2_flow = 0.1};
 
+// real sensor readings always wiggle with noise; feeding bit-identical
+// values would (correctly) look like frozen sensors, so jitter every channel
 double feed(SafetyMonitor& mon, const Readings& r, double seconds, double t0 = 0.0) {
     double t = t0;
     int n = static_cast<int>(std::lround(seconds / DT));
     for (int i = 0; i < n; ++i) {
         t += DT;
-        mon.update(t, DT, r);
+        Readings jittered = r;
+        double eps = (i % 2 == 0) ? 1e-9 : -1e-9;
+        for (auto field : READING_FIELDS) jittered.*field += eps;
+        mon.update(t, DT, jittered);
     }
     return t;
 }
@@ -110,14 +115,72 @@ TEST_CASE("reset flow") {
         CHECK_FALSE(mon.reset(bad));
         CHECK(mon.latched());
     }
-    SECTION("accepted after clear") {
+    SECTION("refused until accumulators drain - one clean sample is not enough") {
+        CHECK_FALSE(mon.reset(HEALTHY));
+        CHECK(mon.latched());
+    }
+    SECTION("accepted once drained") {
+        feed(mon, HEALTHY, 0.5);  // accumulator leaks to zero
         CHECK(mon.reset(HEALTHY));
         CHECK_FALSE(mon.latched());
         CHECK_FALSE(mon.fault().has_value());
     }
     SECTION("history survives reset") {
+        feed(mon, HEALTHY, 0.5);
         mon.reset(HEALTHY);
         CHECK(mon.history().size() >= 1);
+    }
+}
+
+TEST_CASE("persistent violation records exactly one fault") {
+    // 410 bar: above the 400 hard limit, below the plausibility rail -
+    // exactly one check violated, so exactly one record, not one per tick
+    SafetyMonitor mon;
+    feed(mon, with(&Readings::tank_pressure, 410.0), 60.0);
+    CHECK(mon.history().size() == 1);
+}
+
+TEST_CASE("marginal fault dithering through noise still trips") {
+    // 90% of samples violated, 10% clean: the leaky accumulator must climb
+    SafetyMonitor mon;
+    Readings bad = with(&Readings::tank_pressure, 450.0);
+    for (int cycle = 0; cycle < 40 && !mon.latched(); ++cycle) {
+        feed(mon, bad, 0.09, cycle * 0.1);
+        feed(mon, HEALTHY, 0.01, cycle * 0.1 + 0.09);
+    }
+    CHECK(mon.latched());
+}
+
+TEST_CASE("stuck sensor detection") {
+    SafetyMonitor mon;
+
+    SECTION("frozen mid-range channel trips") {
+        Readings r = HEALTHY;
+        double t = 0.0;
+        for (int i = 0; i < 120 && !mon.latched(); ++i) {
+            t += DT;
+            Readings jittered = r;
+            double eps = (i % 2 == 0) ? 1e-9 : -1e-9;
+            for (auto field : READING_FIELDS) jittered.*field += eps;
+            jittered.coolant_temp = 60.0;  // bit-identical every tick
+            mon.update(t, DT, jittered);
+        }
+        REQUIRE(mon.latched());
+        CHECK(mon.fault()->reason == "sensor stuck: coolant_temp");
+    }
+    SECTION("frozen at the rail is exempt (documented blind spot)") {
+        // healthy readings clamp at the rails, so repeats there are legitimate
+        Readings r = HEALTHY;
+        double t = 0.0;
+        for (int i = 0; i < 300; ++i) {
+            t += DT;
+            Readings jittered = r;
+            double eps = (i % 2 == 0) ? 1e-9 : -1e-9;
+            for (auto field : READING_FIELDS) jittered.*field += eps;
+            jittered.h2_flow = 0.0;  // exactly at range_lo, every tick
+            mon.update(t, DT, jittered);
+        }
+        CHECK_FALSE(mon.latched());
     }
 }
 

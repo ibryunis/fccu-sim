@@ -56,6 +56,10 @@ Command ControlLoop::update(State state, const Readings& readings,
                             double demand_pct, double dt) {
     double p_anode = safe(readings.anode_pressure, ANODE_TARGET_BAR);
     double t_cool = safe(readings.coolant_temp, COOLANT_TARGET_C);
+    // hydrogen admission fails CLOSED on a dead pressure sensor: coasting on
+    // the setpoint would mean open-loop H2 flow until the safety monitor
+    // trips. The PI integrator freezes for the outage.
+    bool anode_ok = !std::isnan(readings.anode_pressure);
 
     switch (state) {
     case State::off:
@@ -68,12 +72,14 @@ Command ControlLoop::update(State state, const Readings& readings,
                 .recirc_pump = 1.0, .purge_open = true};
 
     case State::pressurize:
-        return {.h2_valve = pressure_pid_.update(ANODE_TARGET_BAR - p_anode, dt),
+        return {.h2_valve = anode_ok
+                    ? pressure_pid_.update(ANODE_TARGET_BAR - p_anode, dt) : 0.0,
                 .compressor = COMPRESSOR_IDLE, .recirc_pump = 1.0};
 
     case State::warmup: {
         double current = slew_current(WARMUP_CURRENT, dt);
-        return {.h2_valve = pressure_pid_.update(ANODE_TARGET_BAR - p_anode, dt),
+        return {.h2_valve = anode_ok
+                    ? pressure_pid_.update(ANODE_TARGET_BAR - p_anode, dt) : 0.0,
                 .compressor = compressor_for(current), .recirc_pump = 1.0,
                 .current_request = current};
     }
@@ -81,7 +87,8 @@ Command ControlLoop::update(State state, const Readings& readings,
     case State::running: {
         double target = std::clamp(demand_pct, 0.0, 100.0) / 100.0 * fc::I_RATED;
         double current = slew_current(target, dt);
-        return {.h2_valve = pressure_pid_.update(ANODE_TARGET_BAR - p_anode, dt),
+        return {.h2_valve = anode_ok
+                    ? pressure_pid_.update(ANODE_TARGET_BAR - p_anode, dt) : 0.0,
                 .compressor = compressor_for(current), .recirc_pump = 1.0,
                 .cooling = cooling_pid_.update(t_cool - COOLANT_TARGET_C, dt),
                 .current_request = current};

@@ -112,6 +112,17 @@ TEST_CASE("NaN readings never produce NaN commands") {
     CHECK_FALSE(std::isnan(cmd.current_request));
 }
 
+TEST_CASE("H2 valve fails closed on a dead anode pressure sensor") {
+    ControlLoop ctrl;
+    Readings healthy = NOMINAL;
+    for (int i = 0; i < 200; ++i) ctrl.update(State::running, healthy, 50.0, DT);
+
+    Readings dead = NOMINAL;
+    dead.anode_pressure = std::nan("");
+    Command cmd = ctrl.update(State::running, dead, 50.0, DT);
+    CHECK(cmd.h2_valve == 0.0);  // never coast open-loop on the setpoint
+}
+
 TEST_CASE("closed loop: pressure settles on target") {
     Plant plant;
     ControlLoop ctrl;
