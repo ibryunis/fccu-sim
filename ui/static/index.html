@@ -342,6 +342,13 @@ const ORDER = ['OFF','PURGE','PRESSURIZE','WARMUP','RUNNING','SHUTDOWN'];
 function update(s) {
   $('t').textContent = 't = ' + s.t.toFixed(1) + ' s';
 
+  // mirror server-side demand (autotest or API can set it) unless dragging
+  const dem = $('dem');
+  if (document.activeElement !== dem && +dem.value !== s.demand_pct) {
+    dem.value = s.demand_pct;
+    $('demv').textContent = s.demand_pct.toFixed(0) + '%';
+  }
+
   const idx = ORDER.indexOf(s.state);
   document.querySelectorAll('.node').forEach(n => {
     n.classList.toggle('active', n.dataset.s === s.state);

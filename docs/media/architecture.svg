@@ -1,82 +1,87 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 600" font-family="Segoe UI, sans-serif">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 640" font-family="Segoe UI, Arial, sans-serif">
   <defs>
-    <marker id="a" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
-      <path d="M0,0 L8,4 L0,8 z" fill="#8b949e"/>
+    <marker id="a" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto">
+      <path d="M0,0 L9,4.5 L0,9 z" fill="#8b949e"/>
     </marker>
   </defs>
-  <rect width="960" height="600" fill="#0d1117"/>
-  <text x="480" y="30" fill="#e6edf3" font-size="18" text-anchor="middle" font-weight="600">FCCU Simulator - architecture and threading model</text>
+  <rect width="1000" height="640" fill="#0d1117"/>
+  <text x="500" y="34" fill="#e6edf3" font-size="19" text-anchor="middle" font-weight="600">FCCU simulator - architecture</text>
 
-  <!-- plant -->
-  <rect x="40" y="60" width="360" height="280" rx="10" fill="#161b22" stroke="#30363d"/>
-  <text x="220" y="85" fill="#8b949e" font-size="12" text-anchor="middle" letter-spacing="2">PLANT (sim/ - the car)</text>
-  <rect x="60" y="100" width="150" height="44" rx="6" fill="#0d1117" stroke="#58a6ff"/>
-  <text x="135" y="122" fill="#e6edf3" font-size="12" text-anchor="middle">H2 tank 350 bar</text>
-  <text x="135" y="136" fill="#8b949e" font-size="10" text-anchor="middle">ideal gas, cooling on draw</text>
-  <rect x="230" y="100" width="150" height="44" rx="6" fill="#0d1117" stroke="#58a6ff"/>
-  <text x="305" y="122" fill="#e6edf3" font-size="12" text-anchor="middle">anode manifold 2 L</text>
-  <text x="305" y="136" fill="#8b949e" font-size="10" text-anchor="middle">dp/dt = flow x RT/V</text>
-  <rect x="60" y="164" width="150" height="44" rx="6" fill="#0d1117" stroke="#3fb950"/>
-  <text x="135" y="186" fill="#e6edf3" font-size="12" text-anchor="middle">stack 96 cells, 20 kW</text>
-  <text x="135" y="200" fill="#8b949e" font-size="10" text-anchor="middle">Larminie-Dicks polarization</text>
-  <rect x="230" y="164" width="150" height="44" rx="6" fill="#0d1117" stroke="#f85149"/>
-  <text x="305" y="186" fill="#e6edf3" font-size="12" text-anchor="middle">thermal mass 8 kJ/K</text>
-  <text x="305" y="200" fill="#8b949e" font-size="10" text-anchor="middle">waste heat vs cooling</text>
-  <rect x="60" y="228" width="320" height="40" rx="6" fill="#0d1117" stroke="#d29922"/>
-  <text x="220" y="246" fill="#e6edf3" font-size="12" text-anchor="middle">actuators: valve / compressor / recirc / cooling</text>
-  <text x="220" y="260" fill="#8b949e" font-size="10" text-anchor="middle">first-order lag, tau 0.05-0.5 s</text>
-  <rect x="60" y="282" width="320" height="40" rx="6" fill="#0d1117" stroke="#d29922"/>
-  <text x="220" y="300" fill="#e6edf3" font-size="12" text-anchor="middle">sensor suite: 7 channels</text>
-  <text x="220" y="314" fill="#8b949e" font-size="10" text-anchor="middle">gaussian noise + stuck / disconnected / out-of-range injection</text>
+  <!-- PLANT -->
+  <rect x="40" y="60" width="400" height="290" rx="10" fill="#161b22" stroke="#30363d"/>
+  <text x="240" y="84" fill="#8b949e" font-size="11" text-anchor="middle" letter-spacing="2">PLANT &#183; sim/ &#183; the car</text>
+  <g text-anchor="middle">
+    <rect x="60" y="98" width="175" height="52" rx="6" fill="#0d1117" stroke="#58a6ff"/>
+    <text x="147" y="120" fill="#e6edf3" font-size="12">H&#8322; tank, 350 bar</text>
+    <text x="147" y="136" fill="#8b949e" font-size="9.5">ideal gas &#183; cools on draw</text>
+    <rect x="245" y="98" width="175" height="52" rx="6" fill="#0d1117" stroke="#58a6ff"/>
+    <text x="332" y="120" fill="#e6edf3" font-size="12">anode manifold, 2 L</text>
+    <text x="332" y="136" fill="#8b949e" font-size="9.5">dp/dt = flow &#215; RT/V</text>
+    <rect x="60" y="162" width="175" height="52" rx="6" fill="#0d1117" stroke="#3fb950"/>
+    <text x="147" y="184" fill="#e6edf3" font-size="12">stack, 96 cells, 20 kW</text>
+    <text x="147" y="200" fill="#8b949e" font-size="9.5">Larminie-Dicks polarization</text>
+    <rect x="245" y="162" width="175" height="52" rx="6" fill="#0d1117" stroke="#f85149"/>
+    <text x="332" y="184" fill="#e6edf3" font-size="12">thermal mass, 8 kJ/K</text>
+    <text x="332" y="200" fill="#8b949e" font-size="9.5">waste heat vs cooling</text>
+    <rect x="60" y="226" width="360" height="50" rx="6" fill="#0d1117" stroke="#d29922"/>
+    <text x="240" y="247" fill="#e6edf3" font-size="12">actuators: valve &#183; compressor &#183; recirc pump &#183; cooling</text>
+    <text x="240" y="263" fill="#8b949e" font-size="9.5">first-order lag, &#964; = 0.05 - 0.5 s</text>
+    <rect x="60" y="288" width="360" height="50" rx="6" fill="#0d1117" stroke="#d29922"/>
+    <text x="240" y="309" fill="#e6edf3" font-size="12">sensors: 7 channels</text>
+    <text x="240" y="325" fill="#8b949e" font-size="9.5">gaussian noise &#183; stuck / disconnected / out-of-range injection</text>
+  </g>
 
-  <!-- fccu -->
-  <rect x="560" y="60" width="360" height="280" rx="10" fill="#161b22" stroke="#30363d"/>
-  <text x="740" y="85" fill="#8b949e" font-size="12" text-anchor="middle" letter-spacing="2">FCCU (fccu/ - the firmware)</text>
-  <rect x="580" y="100" width="320" height="60" rx="6" fill="#0d1117" stroke="#f85149"/>
-  <text x="740" y="122" fill="#e6edf3" font-size="12" text-anchor="middle">safety monitor (SDC)</text>
-  <text x="740" y="137" fill="#8b949e" font-size="10" text-anchor="middle">20 checks, leaky persistence 500 ms / 1 s (FS EV 5.8.7)</text>
-  <text x="740" y="151" fill="#8b949e" font-size="10" text-anchor="middle">latched shutdown, reset only after accumulators drain</text>
-  <rect x="580" y="176" width="320" height="44" rx="6" fill="#0d1117" stroke="#58a6ff"/>
-  <text x="740" y="196" fill="#e6edf3" font-size="12" text-anchor="middle">state machine</text>
-  <text x="740" y="211" fill="#8b949e" font-size="10" text-anchor="middle">OFF - PURGE - PRESSURIZE - WARMUP - RUNNING - SHUTDOWN - FAULT</text>
-  <rect x="580" y="236" width="320" height="86" rx="6" fill="#0d1117" stroke="#3fb950"/>
-  <text x="740" y="256" fill="#e6edf3" font-size="12" text-anchor="middle">control laws</text>
-  <text x="740" y="272" fill="#8b949e" font-size="10" text-anchor="middle">PI anode pressure - feedforward air (lambda 2.0)</text>
-  <text x="740" y="286" fill="#8b949e" font-size="10" text-anchor="middle">PI cooling to 65 degC - slew-limited current 150 A/s</text>
-  <text x="740" y="300" fill="#8b949e" font-size="10" text-anchor="middle">anti-windup by integrator clamping, fail-closed on NaN</text>
+  <!-- FCCU -->
+  <rect x="560" y="60" width="400" height="290" rx="10" fill="#161b22" stroke="#30363d"/>
+  <text x="760" y="84" fill="#8b949e" font-size="11" text-anchor="middle" letter-spacing="2">FCCU &#183; fccu/ &#183; the firmware</text>
+  <g text-anchor="middle">
+    <rect x="580" y="98" width="360" height="70" rx="6" fill="#0d1117" stroke="#f85149"/>
+    <text x="760" y="120" fill="#e6edf3" font-size="12">safety monitor (SDC)</text>
+    <text x="760" y="137" fill="#8b949e" font-size="9.5">20 checks &#183; leaky persistence, 500 ms / 1 s (FS EV 5.8.7)</text>
+    <text x="760" y="152" fill="#8b949e" font-size="9.5">latched shutdown &#183; reset only after accumulators drain</text>
+    <rect x="580" y="180" width="360" height="56" rx="6" fill="#0d1117" stroke="#58a6ff"/>
+    <text x="760" y="202" fill="#e6edf3" font-size="12">state machine</text>
+    <text x="760" y="219" fill="#8b949e" font-size="9.5">OFF &#8594; PURGE &#8594; PRESSURIZE &#8594; WARMUP &#8594; RUNNING &#8594; SHUTDOWN &#183; FAULT</text>
+    <rect x="580" y="248" width="360" height="90" rx="6" fill="#0d1117" stroke="#3fb950"/>
+    <text x="760" y="270" fill="#e6edf3" font-size="12">control laws</text>
+    <text x="760" y="288" fill="#8b949e" font-size="9.5">PI anode pressure &#183; feedforward air (&#955; = 2.0)</text>
+    <text x="760" y="303" fill="#8b949e" font-size="9.5">PI cooling to 65 &#176;C &#183; current slew-limited, 150 A/s</text>
+    <text x="760" y="318" fill="#8b949e" font-size="9.5">anti-windup by integrator clamping &#183; fail-closed on NaN</text>
+  </g>
 
-  <!-- readings / commands arrows -->
-  <line x1="400" y1="150" x2="558" y2="150" stroke="#8b949e" stroke-width="2" marker-end="url(#a)"/>
-  <text x="480" y="140" fill="#e6edf3" font-size="11" text-anchor="middle">Readings struct</text>
-  <text x="480" y="166" fill="#8b949e" font-size="9" text-anchor="middle">sensors only - never truth</text>
-  <line x1="558" y1="260" x2="400" y2="260" stroke="#8b949e" stroke-width="2" marker-end="url(#a)"/>
-  <text x="480" y="250" fill="#e6edf3" font-size="11" text-anchor="middle">Command struct</text>
-  <text x="480" y="276" fill="#8b949e" font-size="9" text-anchor="middle">actuators only - no internals</text>
+  <!-- readings / commands between the two -->
+  <line x1="442" y1="150" x2="556" y2="150" stroke="#8b949e" stroke-width="2" marker-end="url(#a)"/>
+  <text x="500" y="136" fill="#e6edf3" font-size="11" text-anchor="middle">Readings</text>
+  <text x="500" y="167" fill="#8b949e" font-size="9" text-anchor="middle">sensors only, never truth</text>
+  <line x1="558" y1="260" x2="444" y2="260" stroke="#8b949e" stroke-width="2" marker-end="url(#a)"/>
+  <text x="500" y="246" fill="#e6edf3" font-size="11" text-anchor="middle">Commands</text>
+  <text x="500" y="277" fill="#8b949e" font-size="9" text-anchor="middle">actuators only, no internals</text>
 
-  <!-- runtime bar -->
-  <rect x="40" y="370" width="880" height="90" rx="10" fill="#161b22" stroke="#30363d"/>
-  <text x="480" y="392" fill="#8b949e" font-size="12" text-anchor="middle" letter-spacing="2">RUNTIME - std::jthread at 100 Hz, absolute deadlines (sleep_until)</text>
-  <text x="480" y="414" fill="#e6edf3" font-size="12" text-anchor="middle">tick: sample sensors -&gt; safety -&gt; FSM -&gt; control -&gt; integrate plant -&gt; log</text>
-  <text x="480" y="434" fill="#8b949e" font-size="10" text-anchor="middle">one mutex: held for state mutation or Snapshot copy only - never across file or network I/O</text>
-  <text x="480" y="450" fill="#8b949e" font-size="10" text-anchor="middle">timing rings: exec + period percentiles, deadline-miss counter</text>
+  <!-- runtime -->
+  <line x1="240" y1="350" x2="240" y2="386" stroke="#8b949e" stroke-width="2" marker-end="url(#a)"/>
+  <line x1="760" y1="350" x2="760" y2="386" stroke="#8b949e" stroke-width="2" marker-end="url(#a)"/>
+  <rect x="40" y="390" width="920" height="92" rx="10" fill="#161b22" stroke="#30363d"/>
+  <text x="500" y="414" fill="#8b949e" font-size="11" text-anchor="middle" letter-spacing="2">RUNTIME &#183; std::jthread, 100 Hz, absolute deadlines (sleep_until)</text>
+  <text x="500" y="438" fill="#e6edf3" font-size="12" text-anchor="middle">tick: sample sensors &#8594; safety &#8594; state machine &#8594; control &#8594; integrate plant &#8594; log</text>
+  <text x="500" y="458" fill="#8b949e" font-size="9.5" text-anchor="middle">one mutex, held for state mutation or snapshot copy only - never across file or network I/O</text>
+  <text x="500" y="472" fill="#8b949e" font-size="9.5" text-anchor="middle">timing rings: exec + period percentiles &#183; deadline-miss counter</text>
 
   <!-- io row -->
-  <rect x="40" y="490" width="270" height="80" rx="10" fill="#161b22" stroke="#30363d"/>
-  <text x="175" y="515" fill="#e6edf3" font-size="12" text-anchor="middle">SSE telemetry 20 Hz</text>
-  <text x="175" y="532" fill="#8b949e" font-size="10" text-anchor="middle">one-way push - no WebSocket dep</text>
-  <text x="175" y="548" fill="#8b949e" font-size="10" text-anchor="middle">+ REST commands (cpp-httplib)</text>
-  <rect x="345" y="490" width="270" height="80" rx="10" fill="#161b22" stroke="#30363d"/>
-  <text x="480" y="515" fill="#e6edf3" font-size="12" text-anchor="middle">autotest scenario runner</text>
-  <text x="480" y="532" fill="#8b949e" font-size="10" text-anchor="middle">seeded random faults via the public API</text>
-  <text x="480" y="548" fill="#8b949e" font-size="10" text-anchor="middle">scaled to 2000 parallel runs by fccu_campaign</text>
-  <rect x="650" y="490" width="270" height="80" rx="10" fill="#161b22" stroke="#30363d"/>
-  <text x="785" y="515" fill="#e6edf3" font-size="12" text-anchor="middle">CSV datalog 10 Hz</text>
-  <text x="785" y="532" fill="#8b949e" font-size="10" text-anchor="middle">built under lock, written outside</text>
-  <text x="785" y="548" fill="#8b949e" font-size="10" text-anchor="middle">flush per row - crash loses nothing</text>
-
-  <line x1="220" y1="340" x2="220" y2="368" stroke="#8b949e" stroke-width="2" marker-end="url(#a)"/>
-  <line x1="740" y1="340" x2="740" y2="368" stroke="#8b949e" stroke-width="2" marker-end="url(#a)"/>
-  <line x1="175" y1="460" x2="175" y2="488" stroke="#8b949e" stroke-width="2" marker-end="url(#a)"/>
-  <line x1="480" y1="460" x2="480" y2="488" stroke="#8b949e" stroke-width="2" marker-end="url(#a)"/>
-  <line x1="785" y1="460" x2="785" y2="488" stroke="#8b949e" stroke-width="2" marker-end="url(#a)"/>
+  <line x1="190" y1="482" x2="190" y2="516" stroke="#8b949e" stroke-width="2" marker-end="url(#a)"/>
+  <line x1="500" y1="482" x2="500" y2="516" stroke="#8b949e" stroke-width="2" marker-end="url(#a)"/>
+  <line x1="810" y1="482" x2="810" y2="516" stroke="#8b949e" stroke-width="2" marker-end="url(#a)"/>
+  <g text-anchor="middle">
+    <rect x="40" y="520" width="300" height="86" rx="10" fill="#161b22" stroke="#30363d"/>
+    <text x="190" y="546" fill="#e6edf3" font-size="12">SSE telemetry, 20 Hz</text>
+    <text x="190" y="564" fill="#8b949e" font-size="9.5">one-way push, no WebSocket dependency</text>
+    <text x="190" y="579" fill="#8b949e" font-size="9.5">REST commands &#183; cpp-httplib</text>
+    <rect x="350" y="520" width="300" height="86" rx="10" fill="#161b22" stroke="#30363d"/>
+    <text x="500" y="546" fill="#e6edf3" font-size="12">autotest scenario runner</text>
+    <text x="500" y="564" fill="#8b949e" font-size="9.5">seeded random faults through the public API</text>
+    <text x="500" y="579" fill="#8b949e" font-size="9.5">scaled to 2000 parallel runs by fccu_campaign</text>
+    <rect x="660" y="520" width="300" height="86" rx="10" fill="#161b22" stroke="#30363d"/>
+    <text x="810" y="546" fill="#e6edf3" font-size="12">CSV datalog, 10 Hz</text>
+    <text x="810" y="564" fill="#8b949e" font-size="9.5">row built under lock, written outside</text>
+    <text x="810" y="579" fill="#8b949e" font-size="9.5">flushed per row - a crash loses nothing</text>
+  </g>
 </svg>
