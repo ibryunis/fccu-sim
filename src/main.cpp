@@ -17,6 +17,10 @@
 #include "http_api.hpp"
 #include "httplib.h"
 
+#ifdef _WIN32
+#include <timeapi.h>
+#endif
+
 namespace {
 
 std::string load_dashboard(const char* argv0) {
@@ -37,6 +41,11 @@ std::string load_dashboard(const char* argv0) {
 } // namespace
 
 int main(int, char** argv) {
+#ifdef _WIN32
+    // default Windows timer granularity is ~15.6 ms; a 100 Hz loop using
+    // sleep_until needs 1 ms resolution or most deadlines are missed
+    timeBeginPeriod(1);
+#endif
     fccu::Simulation sim(std::filesystem::path("logs"));
     sim.start_thread();
     std::printf("logging to %s\n", sim.log_path().string().c_str());

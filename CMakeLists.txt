@@ -24,7 +24,7 @@ target_include_directories(fccu_sim PRIVATE src third_party)
 target_link_libraries(fccu_sim PRIVATE fccu_core)
 target_compile_options(fccu_sim PRIVATE -Wall -Wextra)
 if(WIN32)
-    target_link_libraries(fccu_sim PRIVATE ws2_32)
+    target_link_libraries(fccu_sim PRIVATE ws2_32 winmm)
 endif()
 
 add_executable(fccu_campaign src/campaign.cpp)
