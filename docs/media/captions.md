@@ -11,14 +11,22 @@ out the 1 s persistence window and cut load and hydrogen in one 10 ms
 tick. The banner carries the full fault record: reason, measured value,
 limit, timestamp. Reset stays refused until the cause clears.
 
+## campaign_control_room.png
+
+Summary of the verification campaign, every number computed from the
+run data: 200,000 randomized fault scenarios on 12 threads, all
+latched inside their windows. 3,743 h of simulated operation (156
+days) in 100 s wall time, 135,126x realtime, 1.35 billion control
+ticks, 26.9 billion safety-check evaluations. The three deterministic
+fault classes sit exactly on the FS EV 5.8.7 windows; overheat is
+physics-limited. Zero resets accepted while a cause persisted. Any
+seed reproduces its exact run.
+
 ## campaign_summary.png
 
-Console output of the verification campaign: 2000 randomized fault
-scenarios in parallel on 12 workers, all passed. 37.3 h of simulated
-operation in 1.1 s wall time (125,572x realtime). Every scenario checks
-demand tracking, latch timing against the FS windows, refused reset
-while the cause persists, and a clean restart. A failing seed
-reproduces the exact run.
+Console output of a 2000-run smoke campaign: same checks, small scale,
+37.3 h of simulated operation in 1.1 s wall time. The 200,000-run
+report is campaign_control_room.png.
 
 ## fault_timeline.png
 
