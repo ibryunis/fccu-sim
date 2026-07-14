@@ -1,5 +1,5 @@
 @echo off
-rem Build (if needed) and launch the FCCU simulator, then open the dashboard.
+rem Build (if needed) and launch the FCCU simulator; it opens the dashboard itself.
 cd /d "%~dp0"
 
 if not exist build\fccu_sim.exe (
@@ -7,5 +7,4 @@ if not exist build\fccu_sim.exe (
     cmake --build build -j || exit /b 1
 )
 
-start "" http://localhost:8000
 build\fccu_sim.exe

@@ -7,5 +7,5 @@ if [ ! -x build/fccu_sim ]; then
     cmake --build build -j "$(nproc)" || exit 1
 fi
 
-xdg-open http://localhost:8000 2>/dev/null &
 exec build/fccu_sim
+
