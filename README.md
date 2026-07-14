@@ -20,7 +20,10 @@ Linux:
 ./run.sh
 ```
 
-Both build on first run, start the server, and open http://localhost:8000.
+Both build on first run and start the server; the binary opens
+http://localhost:8000 itself. The dashboard is embedded at build time, so
+`build/fccu_sim` (or `fccu_sim.exe`) is a single self-contained file - copy
+it anywhere and run it, no repo needed.
 Press START, move the demand slider, inject faults, reset the latch.
 Every run logs CSV at 10 Hz to `logs/`.
 
