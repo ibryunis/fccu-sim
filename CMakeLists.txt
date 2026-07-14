@@ -19,7 +19,18 @@ target_include_directories(fccu_core PUBLIC include)
 target_link_libraries(fccu_core PUBLIC Threads::Threads)
 target_compile_options(fccu_core PRIVATE -Wall -Wextra)
 
-add_executable(fccu_sim src/main.cpp src/http_api.cpp)
+# bake the dashboard into the binary: fccu_sim stays a single portable file,
+# no ui/ directory needed next to it (the on-disk copy still wins for dev)
+set(DASHBOARD_SRC ${CMAKE_SOURCE_DIR}/ui/static/index.html)
+set(DASHBOARD_CPP ${CMAKE_BINARY_DIR}/generated/dashboard_data.cpp)
+add_custom_command(
+    OUTPUT ${DASHBOARD_CPP}
+    COMMAND ${CMAKE_COMMAND} -DIN=${DASHBOARD_SRC} -DOUT=${DASHBOARD_CPP}
+            -DSYM=DASHBOARD_HTML -P ${CMAKE_SOURCE_DIR}/cmake/embed_file.cmake
+    DEPENDS ${DASHBOARD_SRC} ${CMAKE_SOURCE_DIR}/cmake/embed_file.cmake
+)
+
+add_executable(fccu_sim src/main.cpp src/http_api.cpp ${DASHBOARD_CPP})
 target_include_directories(fccu_sim PRIVATE src third_party)
 target_link_libraries(fccu_sim PRIVATE fccu_core)
 target_compile_options(fccu_sim PRIVATE -Wall -Wextra)
